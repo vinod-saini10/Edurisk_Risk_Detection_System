@@ -1,0 +1,26 @@
+{
+  "features": [
+    "attendance",
+    "study_hours",
+    "prev_marks",
+    "assignment",
+    "internal"
+  ],
+  "rf_metrics": {
+    "rmse": 4.5556,
+    "mae": 3.6445,
+    "r2": 0.8234
+  },
+  "xgb_metrics": {
+    "rmse": 4.4415,
+    "mae": 3.4584,
+    "r2": 0.8321
+  },
+  "feature_importance": {
+    "attendance": 4.0279,
+    "study_hours": 3.7614,
+    "prev_marks": 4.6304,
+    "assignment": 2.5245,
+    "internal": 3.3904
+  }
+}

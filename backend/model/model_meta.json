@@ -1,0 +1,37 @@
+{
+  "model_name": "Linear Regression",
+  "rmse": 4.053,
+  "mae": 3.2175,
+  "r2": 0.8602,
+  "feature_importance": {
+    "attendance": 4.3581,
+    "study_hours": 4.1169,
+    "previous_marks": 4.6818,
+    "assignment_score": 2.6572,
+    "internal_marks": 3.4944
+  },
+  "model_comparison": {
+    "Linear Regression": {
+      "rmse": 4.052998176072729,
+      "mae": 3.2175030197049317,
+      "r2": 0.860190031485077
+    },
+    "Random Forest": {
+      "rmse": 4.549513623340413,
+      "mae": 3.6370890666666664,
+      "r2": 0.8238367714628123
+    },
+    "XGBoost": {
+      "rmse": 4.3640547814988135,
+      "mae": 3.404383659973144,
+      "r2": 0.8379064594454391
+    }
+  },
+  "features": [
+    "attendance",
+    "study_hours",
+    "previous_marks",
+    "assignment_score",
+    "internal_marks"
+  ]
+}

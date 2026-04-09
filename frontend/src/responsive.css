@@ -1,0 +1,119 @@
+/**
+ * responsive.css
+ * Media-query overrides for all pages that use large inline padding/font-sizes.
+ * These rules apply on top of existing inline styles — no logic or design changes.
+ */
+
+/* =============================================
+   MOBILE (<768px)
+   ============================================= */
+@media (max-width: 767px) {
+
+  /* ----- General page containers ----- */
+  /* Clamp max-width containers to viewport width with safe padding */
+  /* Since pages use inline style maxWidth, we target the content level */
+
+  /* ----- BulkUploadPage ----- */
+  /* The card upload box inner padding */
+  .bulk-upload-card {
+    padding: 1.5rem 1rem !important;
+  }
+
+  /* ----- Filters row (AdminDashboard / StudentDashboard) ----- */
+  /* The inline flex row with search + filter buttons */
+  /* Already uses flexWrap:wrap — these ensure min-widths are safe */
+  input[placeholder*="Search"] {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* ----- Result Page — score display ----- */
+  /* The huge score number */
+  [style*="fontSize: \"4.5rem\""] {
+    font-size: 3rem !important;
+  }
+
+  /* ----- Confidence bar — shrink on mobile ----- */
+  [style*="flex: \"0 0 160px\""] {
+    flex: 0 0 120px !important;
+  }
+
+  /* ----- Action buttons at bottom of ResultPage ----- */
+  /* Already flex+wrap — this ensures they're truly full width */
+  [style*="minWidth: 140"] {
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+
+  /* ----- Chart containers ----- */
+  /* Prevent recharts from causing overflow */
+  .recharts-responsive-container {
+    min-width: 0 !important;
+  }
+
+  /* ----- SHAP feature importance chart — reduce left margin on mobile ----- */
+  [style*="margin={{ left: 20"] {
+    margin-left: 0 !important;
+  }
+
+  /* ----- Table min-width for scrollable tables ----- */
+  /* AdminDashboard & StudentDashboard tables already have overflowX:auto wrapper */
+
+  /* ----- HomePage info strip — reduce gap ----- */
+  [style*="gap:\"2rem\""] {
+    gap: 1rem !important;
+  }
+
+  /* ----- Page headings using clamp already — ensure they shrink ----- */
+  h1, h2 {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* ----- Prevent any element wider than viewport ----- */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ----- Navbar fix: ensure brand text doesn't overflow ----- */
+  .navbar-inner {
+    padding: 0 1rem;
+  }
+
+  /* ----- Login/Register cards — safe padding on narrow screens ----- */
+  /* maxWidth 420/440 already set; padding inside the card */
+  [style*="padding: \"2.5rem\""] {
+    padding: 1.5rem 1.25rem !important;
+  }
+
+  /* Input width 100% safety */
+  input, select, textarea {
+    max-width: 100%;
+  }
+
+  /* ----- BulkUploadPage: results header row ----- */
+  /* The Results(n) + Download CSV button row */
+  [style*="justifyContent: \"space-between\", alignItems: \"center\", marginBottom: \"1rem\""] {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
+
+/* =============================================
+   TABLET (768px – 1024px)
+   ============================================= */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Reduce page-level padding slightly on tablet */
+  [style*="padding: \"3rem 1.5rem\""],
+  [style*="padding: \"2.5rem 1.5rem\""],
+  [style*="padding: \"2rem 1.5rem\""] {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  /* Chart grid — still 2 col but with smaller gap */
+  [style*="gridTemplateColumns: \"repeat(auto-fit,minmax(320px,1fr))\""] {
+    gap: 1rem !important;
+  }
+}
