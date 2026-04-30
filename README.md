@@ -24,7 +24,7 @@ EduRisk is a comprehensive, AI-powered platform designed to identify students at
 ### 🔹 Admin Dashboard
 <img src="frontend/public/screenshots/admin_panel1.png" width="800" alt="Admin Dashboard Main"/>
 <br/>
-<img src="frontend/public/screenshots/admin0.png" width="800" alt="Admin Dashboard Detail"/>
+
 
 ---
 
