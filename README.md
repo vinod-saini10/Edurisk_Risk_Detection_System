@@ -8,23 +8,23 @@ EduRisk is a comprehensive, AI-powered platform designed to identify students at
 ## 📸 Screenshots
 
 ### 🔹 Home Page
-<img src="frontend/public/screenshots/student panel1.png" width="800" alt="Home Page"/>
+<img src="frontend/public/screenshots/student_panel1.png" width="800" alt="Home Page"/>
 
 ### 🔹 Predict Page
-<img src="frontend/public/screenshots/student panel4.png" width="800" alt="Predict Page Top"/>
+<img src="frontend/public/screenshots/student_panel4.png" width="800" alt="Predict Page Top"/>
 <br/>
-<img src="frontend/public/screenshots/student panel2.png" width="800" alt="Predict Page Bottom"/>
+<img src="frontend/public/screenshots/student_panel2.png" width="800" alt="Predict Page Bottom"/>
 
 ### 🔹 Result Page
-<img src="frontend/public/screenshots/admin panel0.png" width="800" alt="Result Page Top"/>
-<br/>
-<img src="frontend/public/screenshots/admin panel1.png" width="800" alt="Result Page Bottom"/>
+<img src="frontend/public/screenshots/admin_panel2.png" width="800" alt="Result Page"/>
 
-### 🔹 Student Dashboard
-<img src="frontend/public/screenshots/student_dashboard.png" width="800" alt="Student Dashboard"/>
+### 🔹 Student Profile & Dashboard
+<img src="frontend/public/screenshots/student_panel0.png" width="800" alt="Student Profile"/>
 
 ### 🔹 Admin Dashboard
-<img src="frontend/public/screenshots/admin_dashboard.png" width="800" alt="Admin Dashboard"/>
+<img src="frontend/public/screenshots/admin_panel1.png" width="800" alt="Admin Dashboard Main"/>
+<br/>
+<img src="frontend/public/screenshots/admin0.png" width="800" alt="Admin Dashboard Detail"/>
 
 ---
 
