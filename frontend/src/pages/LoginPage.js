@@ -35,12 +35,12 @@ export default function LoginPage() {
 
       // 🔥 FIXED: api.js handles storage, we just update context
       login(data.access_token, data.user);
-      
+
       // Redirect based on role
       if (data.user.role === "admin") {
-          nav("/admin");
+        nav("/admin");
       } else {
-          nav("/");
+        nav("/");
       }
 
     } catch (err) {

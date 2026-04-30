@@ -1,7 +1,15 @@
 /**
- * ResultPage.js — Step 4 + Step 6
- * Shows prediction result with confidence score, SHAP feature importance chart,
- * and AlertBanner + email notification for High Risk.
+ * ResultPage.js — Explainable AI Result Page
+ *
+ * Sections:
+ *  1. Score + Risk Level (with severity badge)
+ *  2. Input Summary
+ *  3. Why This Prediction (narrative bullets)
+ *  4. Impact Analysis (colour-coded badges)
+ *  5. Smart Recommendations
+ *  6. What-If Projection
+ *  7. SHAP Feature Importance chart
+ *  8. Email Alert (High Risk only)
  */
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -13,51 +21,109 @@ import AlertBanner from "../components/AlertBanner";
 import RiskBadge from "../components/RiskBadge";
 import { sendEmailAlert } from "../api/api";
 
-const RISK_COLOR = { "Low Risk": "#10b981", "Medium Risk": "#f59e0b", "High Risk": "#ef4444", "No Risk": "#10b981" };
-
-const FEATURE_LABELS = {
-  attendance: "Attendance",
-  study_hours: "Study Hours",
-  previous_marks: "Previous Marks",
-  assignment_score: "Assignment Score",
-  internal_marks: "Internal Marks",
+// ─── Colour palette ───────────────────────────────────────────────────────────
+const RISK_COLOR = {
+  "No Risk":     "#10b981",
+  "Low Risk":    "#22d3ee",
+  "Medium Risk": "#f59e0b",
+  "High Risk":   "#ef4444",
 };
 
+const SEVERITY_COLOR = {
+  Safe:     "#10b981",
+  Stable:   "#22d3ee",
+  Moderate: "#f59e0b",
+  Critical: "#ef4444",
+};
+
+const IMPACT_STYLES = {
+  high:     { bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.35)",   color: "#f87171", dot: "#ef4444" },
+  medium:   { bg: "rgba(249,115,22,0.12)",  border: "rgba(249,115,22,0.35)",  color: "#fb923c", dot: "#f97316" },
+  low:      { bg: "rgba(234,179,8,0.12)",   border: "rgba(234,179,8,0.35)",   color: "#facc15", dot: "#eab308" },
+  positive: { bg: "rgba(16,185,129,0.12)",  border: "rgba(16,185,129,0.35)", color: "#34d399", dot: "#10b981" },
+};
+
+const FEATURE_LABELS = {
+  attendance:   "Attendance",
+  study_hours:  "Study Hours",
+  prev_marks:   "Previous Marks",
+  assignment:   "Assignment Score",
+  internal:     "Internal Marks",
+  previous_marks:   "Previous Marks",
+  assignment_score: "Assignment Score",
+  internal_marks:   "Internal Marks",
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function SectionCard({ title, children, accentColor }) {
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.03)",
+      border: `1px solid ${accentColor || "rgba(255,255,255,0.08)"}`,
+      borderRadius: 18,
+      padding: "1.4rem 1.5rem",
+      marginBottom: "1.5rem",
+    }}>
+      <h3 style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.95rem", marginBottom: "1rem", marginTop: 0 }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+function ImpactBadge({ level, text }) {
+  const s = IMPACT_STYLES[level] || IMPACT_STYLES.low;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      background: s.bg, border: `1px solid ${s.border}`,
+      color: s.color, borderRadius: 8,
+      padding: "0.2rem 0.6rem", fontSize: "0.72rem", fontWeight: 700,
+    }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: s.dot, display: "inline-block" }} />
+      {text}
+    </span>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ResultPage() {
   const { state } = useLocation();
   const nav = useNavigate();
   const result = state?.result;
 
-  const [emailSent, setEmailSent] = useState(false);
+  const [emailSent, setEmailSent]       = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
-  const [emailMsg, setEmailMsg] = useState("");
-  const [alertShown, setAlertShown] = useState(true);
+  const [emailMsg, setEmailMsg]         = useState("");
+  const [alertShown, setAlertShown]     = useState(true);
 
-  useEffect(() => {
-    if (!result) nav("/predict");
-  }, [result, nav]);
-
+  useEffect(() => { if (!result) nav("/predict"); }, [result, nav]);
   if (!result) return null;
 
   const {
-    name, email, predicted_score, risk_level, confidence,
-    feature_importance, model_name,
+    name, email, predicted_score, risk_level, risk_severity, confidence,
+    feature_importance, explanation,
     attendance, study_hours, previous_marks, assignment_score, internal_marks,
   } = result;
 
-  const overrideApplied = result.override_applied === true;
+  const riskColor   = RISK_COLOR[risk_level] || "#4f6ef7";
+  const sevColor    = SEVERITY_COLOR[risk_severity] || riskColor;
+  const confPct     = confidence != null ? Math.round(confidence * 100) : null;
 
-  const riskColor = RISK_COLOR[risk_level] || "#4f6ef7";
-  const confPct = confidence != null ? Math.round(confidence * 100) : null;
+  // Narrative bullets from XAI engine
+  const narrative       = explanation?.narrative       || [];
+  const impactAnalysis  = explanation?.impact_analysis || [];
+  const recommendations = explanation?.recommendations || [];
+  const whatIf          = explanation?.what_if;
 
-  // SHAP bar chart data
+  // SHAP bar chart
   const shapData = feature_importance
     ? Object.entries(feature_importance)
-      .map(([key, val]) => ({ name: FEATURE_LABELS[key] || key, value: parseFloat(val) }))
-      .sort((a, b) => b.value - a.value)
+        .map(([key, val]) => ({ name: FEATURE_LABELS[key] || key, value: parseFloat(val) }))
+        .sort((a, b) => b.value - a.value)
     : [];
 
-  // Send email alert
   const handleEmailAlert = async () => {
     setEmailLoading(true); setEmailMsg("");
     try {
@@ -72,63 +138,63 @@ export default function ResultPage() {
   };
 
   return (
-    <div style={{ maxWidth: 750, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
 
-      {/* Step 6: High Risk AlertBanner */}
+      {/* Alert Banner */}
       {alertShown && (
-        <AlertBanner
-          riskLevel={risk_level} score={predicted_score} name={name}
-          onDismiss={() => setAlertShown(false)}
-        />
+        <AlertBanner riskLevel={risk_level} score={predicted_score} name={name} onDismiss={() => setAlertShown(false)} />
       )}
 
-      {/* Header */}
+      {/* ── Page Header ───────────────────────────────────────────────── */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "1.9rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
           Prediction Result
         </h1>
-        <p style={{ color: "#64748b", fontSize: "0.88rem" }}>
-          {name} · {email} · <span style={{ color: "#475569", fontSize: "0.78rem" }}>{model_name}</span>
+        <p style={{ color: "#64748b", fontSize: "0.88rem", margin: 0 }}>
+          {name} · {email}
         </p>
       </div>
 
-      {/* Score + Risk card */}
+      {/* ── Score + Risk ──────────────────────────────────────────────── */}
       <div style={{
-        background: `linear-gradient(135deg, ${riskColor}18, ${riskColor}06)`,
+        background: `linear-gradient(135deg, ${riskColor}1a, ${riskColor}08)`,
         border: `1px solid ${riskColor}40`,
-        borderRadius: 20, padding: "2rem", marginBottom: "1.5rem",
+        borderRadius: 22, padding: "2.2rem", marginBottom: "1.5rem",
         textAlign: "center",
       }}>
-        <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+        <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "0.5rem" }}>
           Predicted Academic Score
         </div>
-        <div style={{ fontSize: "4.5rem", fontWeight: 900, color: riskColor, lineHeight: 1, marginBottom: "0.6rem" }}>
+        <div style={{ fontSize: "5rem", fontWeight: 900, color: riskColor, lineHeight: 1, marginBottom: "0.6rem" }}>
           {Math.round(predicted_score)}
           <span style={{ fontSize: "1.2rem", fontWeight: 400, color: "#475569" }}>/100</span>
         </div>
+
+        {/* Risk Level + Severity */}
+        <div style={{ display: "flex", gap: "0.6rem", justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginBottom: "1rem" }}>
           <RiskBadge level={risk_level} large />
-
-          {overrideApplied && (
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <span style={{ background: "rgba(16,185,129,0.12)", color: "#10b981", border: "1px solid rgba(16,185,129,0.25)", padding: "0.45rem 0.8rem", borderRadius: 10, fontWeight: 700 }}>
-                ✅ No Risk (Strong Academic Performance)
-              </span>
-            </div>
+          {risk_severity && (
+            <span style={{
+              background: `${sevColor}22`, border: `1px solid ${sevColor}55`,
+              color: sevColor, borderRadius: 10, padding: "0.3rem 0.8rem",
+              fontWeight: 700, fontSize: "0.82rem",
+            }}>
+              {risk_severity}
+            </span>
           )}
+        </div>
 
-        {/* Confidence score */}
+        {/* Confidence */}
         {confPct != null && (
-          <div style={{ marginTop: "1.2rem" }}>
-            <p style={{ color: "#64748b", fontSize: "0.78rem", marginBottom: "0.4rem" }}>
-              Model Confidence
-            </p>
+          <div>
+            <p style={{ color: "#64748b", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Model Confidence</p>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", justifyContent: "center" }}>
-              <div style={{ flex: "0 0 160px", height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
+              <div style={{ flex: "0 0 180px", height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 99, overflow: "hidden" }}>
                 <div style={{
                   height: "100%", borderRadius: 99,
                   width: `${confPct}%`,
                   background: `linear-gradient(90deg, ${riskColor}, ${riskColor}99)`,
-                  transition: "width 1s ease",
+                  transition: "width 1.2s ease",
                 }} />
               </div>
               <span style={{ color: riskColor, fontWeight: 700, fontSize: "1rem" }}>{confPct}%</span>
@@ -137,90 +203,184 @@ export default function ResultPage() {
         )}
       </div>
 
-      {/* Input summary */}
-      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.5rem" }}>
-        <h3 style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.9rem", marginBottom: "0.8rem" }}>📋 Input Summary</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: "0.6rem" }}>
+      {/* ── Input Summary ─────────────────────────────────────────────── */}
+      <SectionCard title="📋 Input Summary">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "0.6rem" }}>
           {[
-            ["📅 Attendance", `${attendance}%`],
-            ["📖 Study Hours", `${study_hours}h/day`],
-            ["📝 Prev. Marks", previous_marks],
-            ["📋 Assignment", assignment_score],
-            ["🧪 Internal", internal_marks],
+            ["📅 Attendance",   `${attendance}%`],
+            ["📖 Study Hours",  `${study_hours}h/day`],
+            ["📝 Prev. Marks",  previous_marks],
+            ["📋 Assignment",   assignment_score],
+            ["🧪 Internal",     internal_marks],
           ].map(([label, val]) => (
-            <div key={label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "0.6rem 0.8rem" }}>
-              <p style={{ margin: 0, fontSize: "0.72rem", color: "#64748b" }}>{label}</p>
-              <p style={{ margin: "2px 0 0", fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>{val}</p>
+            <div key={label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "0.65rem 0.9rem" }}>
+              <p style={{ margin: 0, fontSize: "0.7rem", color: "#64748b" }}>{label}</p>
+              <p style={{ margin: "3px 0 0", fontSize: "1.05rem", fontWeight: 700, color: "#e2e8f0" }}>{val}</p>
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Step 4: SHAP Feature Importance */}
+      {/* ── Why This Prediction ───────────────────────────────────────── */}
+      {narrative.length > 0 && (
+        <SectionCard title="🔎 Why This Prediction" accentColor={`${riskColor}30`}>
+          <p style={{ color: "#64748b", fontSize: "0.8rem", marginBottom: "0.9rem", marginTop: 0 }}>
+            Factors that determined this academic risk score:
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+            {narrative.map((item, i) => {
+              const s = IMPACT_STYLES[item.impact] || IMPACT_STYLES.low;
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "flex-start", gap: "0.75rem",
+                  background: s.bg, border: `1px solid ${s.border}`,
+                  borderRadius: 12, padding: "0.7rem 1rem",
+                }}>
+                  <span style={{ fontSize: "1.1rem", lineHeight: 1, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                  <span style={{ color: "#e2e8f0", fontSize: "0.875rem", lineHeight: 1.5 }}>{item.text}</span>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* ── Impact Analysis ───────────────────────────────────────────── */}
+      {impactAnalysis.length > 0 && (
+        <SectionCard title="📊 Impact Analysis">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: "0.65rem" }}>
+            {impactAnalysis.map((item, i) => {
+              const s = IMPACT_STYLES[item.impact_level] || IMPACT_STYLES.low;
+              return (
+                <div key={i} style={{
+                  background: s.bg, border: `1px solid ${s.border}`,
+                  borderRadius: 12, padding: "0.75rem 1rem",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <div>
+                    <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: 2 }}>{item.label}</div>
+                    <div style={{ fontSize: "1rem", fontWeight: 700, color: "#f1f5f9" }}>{item.value}</div>
+                  </div>
+                  <ImpactBadge level={item.impact_level} text={item.badge} />
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* ── Smart Recommendations ─────────────────────────────────────── */}
+      {recommendations.length > 0 && (
+        <SectionCard title="💡 Smart Recommendations">
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+            {recommendations.map((rec, i) => (
+              <div key={i} style={{
+                display: "flex", gap: "0.75rem", alignItems: "flex-start",
+                background: "rgba(79,110,247,0.08)", border: "1px solid rgba(79,110,247,0.2)",
+                borderRadius: 12, padding: "0.7rem 1rem",
+              }}>
+                <span style={{
+                  flexShrink: 0, width: 22, height: 22,
+                  background: "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+                  borderRadius: "50%", color: "#fff",
+                  fontSize: "0.7rem", fontWeight: 800,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {i + 1}
+                </span>
+                <span style={{ color: "#e2e8f0", fontSize: "0.875rem", lineHeight: 1.5 }}>{rec}</span>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* ── What-If Projection ────────────────────────────────────────── */}
+      {whatIf && whatIf.improved_score > predicted_score && (
+        <SectionCard title="🔮 What-If Projection" accentColor="rgba(16,185,129,0.3)">
+          <p style={{ color: "#64748b", fontSize: "0.8rem", marginTop: 0, marginBottom: "1rem" }}>
+            If you follow the recommendations above, here's your projected outcome:
+          </p>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+            {/* Current */}
+            <div style={{
+              flex: 1, minWidth: 140, textAlign: "center",
+              background: `${riskColor}15`, border: `1px solid ${riskColor}40`,
+              borderRadius: 14, padding: "1rem",
+            }}>
+              <div style={{ fontSize: "0.7rem", color: "#64748b", marginBottom: 4 }}>CURRENT</div>
+              <div style={{ fontSize: "2.2rem", fontWeight: 900, color: riskColor }}>{Math.round(predicted_score)}</div>
+              <div style={{ fontSize: "0.78rem", color: riskColor, fontWeight: 600 }}>{risk_level}</div>
+            </div>
+
+            {/* Arrow */}
+            <div style={{ display: "flex", alignItems: "center", fontSize: "1.5rem", color: "#475569" }}>→</div>
+
+            {/* Improved */}
+            <div style={{
+              flex: 1, minWidth: 140, textAlign: "center",
+              background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)",
+              borderRadius: 14, padding: "1rem",
+            }}>
+              <div style={{ fontSize: "0.7rem", color: "#64748b", marginBottom: 4 }}>PROJECTED</div>
+              <div style={{ fontSize: "2.2rem", fontWeight: 900, color: "#10b981" }}>{Math.round(whatIf.improved_score)}</div>
+              <div style={{ fontSize: "0.78rem", color: "#10b981", fontWeight: 600 }}>{whatIf.improved_risk}</div>
+              <div style={{ fontSize: "0.68rem", color: "#34d399", marginTop: 2 }}>{whatIf.improved_severity}</div>
+            </div>
+          </div>
+
+          {/* Improvements list */}
+          {(whatIf.improvements_applied || []).length > 0 && (
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "0.4rem" }}>Changes applied in simulation:</p>
+              {whatIf.improvements_applied.map((imp, i) => (
+                <div key={i} style={{ fontSize: "0.8rem", color: "#94a3b8", padding: "2px 0" }}>
+                  ✔ {imp}
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {/* ── SHAP Feature Importance ───────────────────────────────────── */}
       {shapData.length > 0 && (
-        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.5rem" }}>
-          <h3 style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.9rem", marginBottom: "0.8rem" }}>
-            🧠 Feature Importance (SHAP)
-          </h3>
-          <p style={{ color: "#64748b", fontSize: "0.78rem", marginBottom: "0.8rem" }}>
-            Factors that most influenced this prediction
+        <SectionCard title="🧠 Feature Importance (SHAP)">
+          <p style={{ color: "#64748b", fontSize: "0.78rem", marginTop: 0, marginBottom: "0.8rem" }}>
+            Relative contribution of each factor to this prediction
           </p>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={shapData} layout="vertical" margin={{ left: 20, right: 20 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={v => `${(v * 100).toFixed(1)}%`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} width={110} />
-              <Tooltip formatter={v => `${(v * 100).toFixed(2)}%`} contentStyle={{ background: "#1e2235", border: "1px solid rgba(79,110,247,0.3)", borderRadius: 8 }} labelStyle={{ color: "#94a3b8" }} itemStyle={{ color: "#7c9ef7" }} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#94a3b8" }} width={120} />
+              <Tooltip
+                formatter={v => `${(v * 100).toFixed(2)}%`}
+                contentStyle={{ background: "#1e2235", border: "1px solid rgba(79,110,247,0.3)", borderRadius: 8 }}
+                labelStyle={{ color: "#94a3b8" }}
+                itemStyle={{ color: "#7c9ef7" }}
+              />
               <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={14}>
-                {shapData.map((entry, i) => (
-                  <Cell key={i} fill={`hsl(${220 + i * 20},70%,${65 - i * 5}%)`} />
+                {shapData.map((_, i) => (
+                  <Cell key={i} fill={`hsl(${220 + i * 22},70%,${65 - i * 5}%)`} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </SectionCard>
       )}
 
-      {/* Why this prediction + Recommendations */}
-      {result.explanation && (
-        <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.5rem" }}>
-          <h3 style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.9rem", marginBottom: "0.6rem" }}>🔎 Why this prediction</h3>
-          <p style={{ color: "#94a3b8", marginBottom: 8 }}>Top contributing factors:</p>
-          <ol>
-            {(result.explanation.top_reasons || []).map((r, i) => <li key={i}>{r}</li>)}
-          </ol>
-
-          {(result.explanation.improvements || []).length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <h4 style={{ margin: "8px 0", color: "#e2f7ea", fontSize: "0.9rem" }}>✅ Positive note</h4>
-              <ul>
-                {(result.explanation.improvements || []).map((m, i) => <li key={i}>{m}</li>)}
-              </ul>
-            </div>
-          )}
-
-          <h3 style={{ fontWeight: 600, color: "#e2e8f0", fontSize: "0.9rem", marginTop: 12, marginBottom: 8 }}>💡 Personalized recommendations</h3>
-          <ul>
-            {(result.recommendations?.study_plan || []).map((s, i) => <li key={i}>{s}</li>)}
-          </ul>
-          {result.recommendations?.weekly_target && <p style={{ color: "#94a3b8" }}><strong>Weekly target:</strong> {result.recommendations.weekly_target}</p>}
-        </div>
-      )}
-
-      {/* Step 6: Email Alert button */}
+      {/* ── Email Alert (High Risk only) ──────────────────────────────── */}
       {risk_level === "High Risk" && (
-        <div style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 16, padding: "1.25rem", marginBottom: "1.5rem" }}>
-          <h3 style={{ fontWeight: 600, color: "#ef4444", fontSize: "0.9rem", marginBottom: "0.5rem" }}>
-            📧 Send Email Alert
-          </h3>
-          <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: "0.9rem" }}>
+        <SectionCard title="📧 Send Email Alert" accentColor="rgba(239,68,68,0.25)">
+          <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginTop: 0, marginBottom: "0.9rem" }}>
             Send a high-risk warning email to <strong>{email}</strong>
           </p>
           <button
             onClick={handleEmailAlert}
             disabled={emailSent || emailLoading}
             style={{
-              background: emailSent ? "rgba(16,185,129,0.2)" : emailLoading ? "rgba(79,110,247,0.3)" : "rgba(239,68,68,0.15)",
+              background: emailSent ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.15)",
               border: `1px solid ${emailSent ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.35)"}`,
               borderRadius: 10, color: emailSent ? "#10b981" : "#f87171",
               padding: "0.65rem 1.2rem", fontSize: "0.88rem", fontWeight: 600,
@@ -231,14 +391,12 @@ export default function ResultPage() {
             {emailLoading ? "⏳ Sending…" : emailSent ? "✅ Email Sent!" : "📧 Send Alert Email"}
           </button>
           {emailMsg && (
-            <p style={{ marginTop: "0.6rem", fontSize: "0.8rem", color: emailSent ? "#10b981" : "#f87171" }}>
-              {emailMsg}
-            </p>
+            <p style={{ marginTop: "0.6rem", fontSize: "0.8rem", color: emailSent ? "#10b981" : "#f87171" }}>{emailMsg}</p>
           )}
-        </div>
+        </SectionCard>
       )}
 
-      {/* Actions */}
+      {/* ── Actions ───────────────────────────────────────────────────── */}
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
         <button onClick={() => nav("/predict")} style={{
           flex: 1, minWidth: 140, padding: "0.8rem",
@@ -263,6 +421,7 @@ export default function ResultPage() {
           📋 My History
         </button>
       </div>
+
     </div>
   );
 }

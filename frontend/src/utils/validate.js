@@ -22,7 +22,7 @@ export function validatePredictForm(form) {
 
   const numRules = [
     { field: "attendance",       label: "Attendance",     min: 0,  max: 100 },
-    { field: "study_hours",      label: "Study hours",    min: 0,  max: 24  },
+    { field: "study_hours",      label: "Study hours",    min: 0,  max: 10  },
     { field: "previous_marks",   label: "Previous marks", min: 0,  max: 100 },
     { field: "assignment_score", label: "Assignment",     min: 0,  max: 100 },
     { field: "internal_marks",   label: "Internal marks", min: 0,  max: 100 },

@@ -40,15 +40,14 @@ def create_app():
     # ─────────────────────────────
     # 🔹 1. CORS CONFIG
     # ─────────────────────────────
-    CORS(app, supports_credentials=True)
-
-    # ─────────────────────────────
-    # ⚠️ Handle preflight OPTIONS
-    # ─────────────────────────────
-    @app.before_request
-    def handle_preflight():
-        if request.method == 'OPTIONS':
-            return ('', 200)
+    CORS(
+        app,
+        supports_credentials=True,
+        origins=["http://localhost:3000"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+        expose_headers=["Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    )
 
     # ─────────────────────────────
     # 🔐 2. JWT CONFIG
@@ -61,18 +60,30 @@ def create_app():
     jwt = JWTManager(app)
     bcrypt = Bcrypt(app)
 
-    # JWT Error Handlers
+    # ─────────────────────────────
+    # 🔍 DEBUG: Print Incoming Headers
+    # ─────────────────────────────
+    @app.before_request
+    def debug_headers():
+        if request.method != 'OPTIONS' and request.path.startswith("/api/"):
+            auth = request.headers.get("Authorization", "(none)")
+            print(f"[DEBUG] {request.method} {request.path} -> Auth Header: {auth[:20]}...")
+
+    # JWT Error Handlers — with console logging for easier debugging
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
-        return jsonify({"error": "Token has expired"}), 401
+        print("[JWT] Token expired:", jwt_payload)
+        return jsonify({"error": "Token has expired — please log in again"}), 401
 
     @jwt.invalid_token_loader
     def invalid_token_callback(error):
-        return jsonify({"error": "Invalid token"}), 401
+        print("[JWT] Invalid token:", error)
+        return jsonify({"error": "Invalid token — please log in again"}), 401
 
     @jwt.unauthorized_loader
     def missing_token_callback(error):
-        return jsonify({"error": "Missing Authorization Header"}), 401
+        print("[JWT] Missing/no token:", error)
+        return jsonify({"error": "Authorization header missing — please log in"}), 401
 
     # Global Error Handler
     register_error_handlers(app)

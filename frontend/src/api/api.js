@@ -6,16 +6,36 @@ const api = axios.create({
   baseURL: API_BASE
 });
 
-// 🔥 INTERCEPTOR: Attach Token automatically
+// 🔥 REQUEST INTERCEPTOR: Attach token to every request
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem("edurisk_token");
     if (token) {
+      // Safely ensure headers object exists before setting Authorization
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// 🔒 RESPONSE INTERCEPTOR: Handle expired / invalid tokens globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    if (status === 401) {
+      // Token missing, expired, or invalid — clear storage and redirect to login
+      sessionStorage.removeItem("edurisk_token");
+      sessionStorage.removeItem("edurisk_user");
+      if (!window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
+    }
+    // 403 (admin role required) — let the calling component handle it
+    return Promise.reject(error);
+  }
 );
 
 // --- AUTH ---
@@ -76,6 +96,7 @@ export const logoutUser = () => {
 };
 
 export default api;
+
 // --- Notifications ---
 export const sendEmailAlert = (data) =>
-  axios.post(`${API_BASE}/notify/email`, data);
+  api.post("/notify/email", data);

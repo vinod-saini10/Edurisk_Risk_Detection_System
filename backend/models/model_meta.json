@@ -7,20 +7,20 @@
     "internal"
   ],
   "rf_metrics": {
-    "rmse": 4.5556,
-    "mae": 3.6445,
-    "r2": 0.8234
+    "rmse": 5.9718,
+    "mae": 4.7974,
+    "r2": 0.8673
   },
   "xgb_metrics": {
-    "rmse": 4.4415,
-    "mae": 3.4584,
-    "r2": 0.8321
+    "rmse": 5.4833,
+    "mae": 4.4302,
+    "r2": 0.8881
   },
   "feature_importance": {
-    "attendance": 4.0279,
-    "study_hours": 3.7614,
-    "prev_marks": 4.6304,
-    "assignment": 2.5245,
-    "internal": 3.3904
+    "attendance": 7.5725,
+    "study_hours": 4.9807,
+    "prev_marks": 6.3982,
+    "assignment": 4.002,
+    "internal": 5.3215
   }
 }

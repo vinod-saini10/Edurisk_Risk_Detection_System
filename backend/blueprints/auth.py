@@ -199,18 +199,23 @@ def login():
         if is_verified == 0:
             return jsonify({"error": "Please verify your email first"}), 401
 
-        # 🔥 FIXED: JWT stores ID as identity and ROLE as additional claim
+        # JWT identity MUST be a string (user_id) for flask_jwt_extended compatibility.
+        # Storing a dictionary here causes 401 Invalid Token on verification.
         user_id = row[0]
-        role = row[4]
-        token = create_access_token(identity=str(user_id), additional_claims={"role": role})
+        name    = row[1]
+        role    = row[4]
+        token = create_access_token(
+            identity=str(user_id),
+            additional_claims={"role": role, "name": name}
+        )
 
         return jsonify({
             "access_token": token,
             "user": {
-                "id": row[0],
-                "name": row[1],
+                "id":    row[0],
+                "name":  row[1],
                 "email": row[2],
-                "role": row[4]
+                "role":  row[4]
             }
         }), 200
 
@@ -222,7 +227,8 @@ def login():
 @jwt_required()
 def profile():
     try:
-        user_id = get_jwt_identity()
+        identity = get_jwt_identity()
+        user_id = identity.get("id") if isinstance(identity, dict) else identity
 
         conn = get_connection()
         cursor = conn.cursor()

@@ -9,13 +9,13 @@ import { validatePredictForm } from "../utils/validate";
 
 
 const fields = [
-  { name: "name", label: "Full Name", type: "text", min: null, max: null, placeholder: "e.g. Vinod Sharma", icon: "👤" },
-  { name: "email", label: "Email Address", type: "email", min: null, max: null, placeholder: "e.g. vinod@pcu.edu", icon: "✉️" },
-  { name: "attendance", label: "Attendance (%)", type: "number", min: 0, max: 100, placeholder: "40 – 100", icon: "📅" },
-  { name: "study_hours", label: "Study Hours/Day", type: "number", min: 0, max: 24, placeholder: "1 – 10", icon: "📖" },
-  { name: "previous_marks", label: "Previous Marks", type: "number", min: 0, max: 100, placeholder: "35 – 95", icon: "📝" },
-  { name: "assignment_score", label: "Assignment Score", type: "number", min: 0, max: 100, placeholder: "40 – 100", icon: "📋" },
-  { name: "internal_marks", label: "Internal Marks", type: "number", min: 0, max: 100, placeholder: "30 – 100", icon: "🧪" },
+  { name: "name",           label: "Full Name",        type: "text",   min: null, max: null, placeholder: "e.g. Vinod Sharma",   icon: "👤", hint: null },
+  { name: "email",          label: "Email Address",    type: "email",  min: null, max: null, placeholder: "e.g. vinod@pcu.edu",   icon: "✉️", hint: null },
+  { name: "attendance",     label: "Attendance (%)",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "📅", hint: "Range: 0 – 100%" },
+  { name: "study_hours",    label: "Study Hours/Day",  type: "number", min: 0,    max: 10,   placeholder: "Enter 0 – 10",          icon: "📖", hint: "Range: 0 – 10 hrs/day" },
+  { name: "previous_marks", label: "Previous Marks",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "📝", hint: "Range: 0 – 100" },
+  { name: "assignment_score", label: "Assignment Score", type: "number", min: 0, max: 100,  placeholder: "Enter 0 – 100",         icon: "📋", hint: "Range: 0 – 100" },
+  { name: "internal_marks", label: "Internal Marks",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "🧪", hint: "Range: 0 – 100" },
 ];
 
 const init = { name: "", email: "", attendance: "", study_hours: "", previous_marks: "", assignment_score: "", internal_marks: "" };
@@ -129,6 +129,9 @@ export default function PredictPage() {
                 }}
                 onFocus={e => e.target.style.borderColor = "#4f6ef7"}
               />
+              {f.hint && !hasError && (
+                <p style={{ margin: "3px 0 0 2px", fontSize: "0.7rem", color: "#475569" }}>{f.hint}</p>
+              )}
             </div>
           );
         })}

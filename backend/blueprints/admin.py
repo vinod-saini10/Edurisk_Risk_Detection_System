@@ -78,20 +78,22 @@ def compute_analytics():
     row = cursor.fetchone()
     avg_score = float(row[0]) if row and row[0] is not None else 0.0
 
-    # risk distribution
+    # risk distribution — 4 tiers, case-insensitive matching
     cursor.execute("SELECT risk_level, COUNT(*) FROM predictions GROUP BY risk_level")
     dist_rows = cursor.fetchall()
-    risk_distribution = {"high": 0, "medium": 0, "low": 0}
+    risk_distribution = {"no_risk": 0, "low": 0, "medium": 0, "high": 0}
     for rl, cnt in dist_rows:
         if not rl:
             continue
         key = rl.strip().lower()
-        if key.startswith("high"):
-            risk_distribution["high"] = int(cnt)
+        if key.startswith("no"):
+            risk_distribution["no_risk"] = risk_distribution["no_risk"] + int(cnt)
+        elif key.startswith("high"):
+            risk_distribution["high"] = risk_distribution["high"] + int(cnt)
         elif key.startswith("medium"):
-            risk_distribution["medium"] = int(cnt)
+            risk_distribution["medium"] = risk_distribution["medium"] + int(cnt)
         elif key.startswith("low"):
-            risk_distribution["low"] = int(cnt)
+            risk_distribution["low"] = risk_distribution["low"] + int(cnt)
 
     # trend over time (daily average)
     cursor.execute("SELECT DATE(created_at) as dt, AVG(predicted_score) FROM predictions GROUP BY DATE(created_at) ORDER BY DATE(created_at) ASC")
@@ -101,14 +103,44 @@ def compute_analytics():
             continue
         trend.append({"date": str(dt), "avg_score": float(avg) if avg is not None else 0.0})
 
+    # Top High-Risk Students: Only the LATEST prediction per student
+    cursor.execute("""
+        SELECT s.id AS student_id, s.name, s.email,
+               p.predicted_score AS latest_score,
+               p.risk_level
+        FROM predictions p
+        JOIN students s ON s.id = p.student_id
+        JOIN (
+            SELECT student_id, MAX(id) AS latest_id
+            FROM predictions
+            GROUP BY student_id
+        ) latest ON p.id = latest.latest_id
+        WHERE LOWER(p.risk_level) LIKE 'high%'
+        ORDER BY p.predicted_score ASC
+        LIMIT 5
+    """)
+    top_high_risk_rows = cursor.fetchall()
+    top_high_risk_students = [
+        {
+            "student_id": row[0],
+            "name": row[1],
+            "email": row[2],
+            "avg_score": round(float(row[3]), 1) if row[3] is not None else 0.0,
+            "risk_level": row[4],
+        }
+        for row in top_high_risk_rows
+    ]
+
     cursor.close()
     conn.close()
 
     return {
         "total_students": total_students,
         "avg_score": round(avg_score, 2),
+        "average_predicted_score": round(avg_score, 2),  # alias for frontend compatibility
         "risk_distribution": risk_distribution,
         "trend_over_time": trend,
+        "top_high_risk_students": top_high_risk_students,
     }
 
 

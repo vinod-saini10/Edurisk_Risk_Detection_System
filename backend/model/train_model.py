@@ -31,36 +31,54 @@ META_PATH = os.path.join(MODELS_DIR, "model_meta.json")
 FEATURES = ["attendance", "study_hours", "prev_marks", "assignment", "internal"]
 
 
-def generate_dataset(n: int = 2500) -> pd.DataFrame:
-    np.random.seed(42)
-    att = np.random.uniform(40, 100, n)
-    sh = np.random.uniform(1, 10, n)
-    pm = np.random.uniform(35, 95, n)
-    asn = np.random.uniform(40, 100, n)
-    im = np.random.uniform(30, 100, n)
-    noise = np.random.normal(0, 4, n)
+def generate_dataset(n: int = 3000) -> pd.DataFrame:
+    """Generate a full-range synthetic dataset covering 0–100 for all features.
 
-    final = np.clip(0.3 * att + 2.0 * sh + 0.3 * pm + 0.2 * asn + 0.2 * im + noise, 0, 100)
+    Score formula deliberately weights study_hours heavily (2.0 coeff) so
+    low-effort students cluster in High Risk and strong students reach No Risk.
+    """
+    np.random.seed(42)
+    att = np.random.uniform(0, 100, n)
+    sh  = np.random.uniform(0, 10, n)
+    pm  = np.random.uniform(0, 100, n)
+    asn = np.random.uniform(0, 100, n)
+    im  = np.random.uniform(0, 100, n)
+    noise = np.random.normal(0, 5, n)
+
+    # Linear combination — same weights as before, clipped to [0, 100]
+    final = np.clip(
+        0.30 * att + 2.0 * sh + 0.30 * pm + 0.20 * asn + 0.20 * im + noise,
+        0, 100
+    )
 
     df = pd.DataFrame({
-        "attendance": np.round(att, 2),
-        "study_hours": np.round(sh, 2),
-        "prev_marks": np.round(pm, 2),
-        "assignment": np.round(asn, 2),
-        "internal": np.round(im, 2),
+        "attendance":     np.round(att, 2),
+        "study_hours":    np.round(sh,  2),
+        "prev_marks":     np.round(pm,  2),
+        "assignment":     np.round(asn, 2),
+        "internal":       np.round(im,  2),
         "predicted_score": np.round(final, 2),
     })
 
     os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
     df.to_csv(CSV_PATH, index=False)
-    print(f"[ML] Synthetic dataset generated → {CSV_PATH}")
+    print(f"[ML] Full-range dataset generated ({n} rows) -> {CSV_PATH}")
     return df
 
 
 def classify_risk(score: float) -> str:
-    if score >= 75:
+    """Classify predicted score into 4 canonical risk tiers.
+
+    No Risk   → 90–100  (academically strong)
+    Low Risk  → 75–89   (on track)
+    Medium Risk → 65–74 (needs monitoring)
+    High Risk → < 65    (intervention required)
+    """
+    if score >= 90:
+        return "No Risk"
+    elif score >= 75:
         return "Low Risk"
-    elif score >= 50:
+    elif score >= 65:
         return "Medium Risk"
     return "High Risk"
 
@@ -83,12 +101,12 @@ def _compute_shap_importance(xgb_model, X_sc):
         return {f: 0.0 for f in FEATURES}
 
 
-def train():
+def train(force_regenerate: bool = False):
     os.makedirs(MODELS_DIR, exist_ok=True)
 
-    # Load dataset
-    if not os.path.exists(CSV_PATH):
-        print("[ML] Dataset not found — generating synthetic dataset")
+    # Load or regenerate dataset
+    if force_regenerate or not os.path.exists(CSV_PATH):
+        print("[ML] Generating full-range dataset …")
         df = generate_dataset()
     else:
         df = pd.read_csv(CSV_PATH)
@@ -169,14 +187,14 @@ def train():
     with open(META_PATH, "w") as f:
         json.dump(meta, f, indent=2)
 
-    print(f"[ML] Saved models → {RF_PATH}, {XGB_PATH if xgb is not None else '(no xgb)'}")
+    print(f"[ML] Saved models -> {RF_PATH}, {XGB_PATH if xgb is not None else '(no xgb)'}")
     return rf, xgb, scaler, meta
 
 
 def load_model():
     need_train = not (os.path.exists(RF_PATH) and os.path.exists(SCALER_PATH) and os.path.exists(META_PATH))
     if need_train:
-        print("[ML] Artifacts missing — training now …")
+        print("[ML] Artifacts missing -- training now...")
         return train()
 
     rf = joblib.load(RF_PATH)

@@ -9,7 +9,12 @@ import StatCard from "../components/StatCard";
 import Loader from "../components/Loader";
 import { useAuth } from "../context/AuthContext";
 
-const RISK_COLOR = { "Low Risk": "#10b981", "Medium Risk": "#f59e0b", "High Risk": "#ef4444" };
+const RISK_COLOR = {
+  "Low Risk": "#22d3ee",
+  "Medium Risk": "#f59e0b",
+  "High Risk": "#ef4444",
+  "No Risk": "#10b981",
+};
 
 const tip = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
@@ -56,16 +61,33 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    Promise.all([getAllPredictions(), getAdminCharts(), getAdminAnalytics(), getAdminInsights(), getModelMetrics()])
-      .then(([s, c, a, ins, mm]) => {
+    const fetchDashboardData = async () => {
+      console.log("Fetching dashboard data...");
+      setLoading(true);
+      try {
+        const [s, c, a, ins, mm] = await Promise.all([
+          getAllPredictions(),
+          getAdminCharts(),
+          getAdminAnalytics(),
+          getAdminInsights(),
+          getModelMetrics()
+        ]);
+        
+        console.log("Dashboard data fetched successfully!");
         setStudents(s.data);
         setCharts(c.data);
         setAnalytics(a.data);
         setInsights(ins.data?.insights || []);
         setMetrics(mm.data || null);
-      })
-      .catch(e => setError(e.response?.data?.error || "Failed to load data. Is the backend running?"))
-      .finally(() => setLoading(false));
+      } catch (e) {
+        console.error("Error fetching dashboard data:", e);
+        setError(e.response?.data?.error || "Failed to load data. Is the backend running?");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
 
   const filtered = students
@@ -84,6 +106,8 @@ export default function AdminDashboard() {
   const total = students.length;
   const highRisk = students.filter(s => s.risk_level === "High Risk").length;
   const medRisk = students.filter(s => s.risk_level === "Medium Risk").length;
+  const lowRisk = students.filter(s => s.risk_level === "Low Risk").length;
+  const noRisk = students.filter(s => s.risk_level === "No Risk").length;
   const avgScore = total ? (students.reduce((a, s) => a + s.predicted_score, 0) / total).toFixed(1) : 0;
 
   const pieData = charts?.risk_distribution
@@ -128,12 +152,14 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "1rem", marginBottom: "2rem" }}>
-        <StatCard label="Total Students" value={total} icon="👥" color="#4f6ef7" />
+      {/* Stats — 4 tier */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "1rem", marginBottom: "2rem" }}>
+        <StatCard label="Total Predictions" value={total} icon="👥" color="#4f6ef7" />
         <StatCard label="High Risk" value={highRisk} icon="🔴" color="#ef4444" sub="Needs attention" />
         <StatCard label="Medium Risk" value={medRisk} icon="🟡" color="#f59e0b" />
-        <StatCard label="Average Score" value={avgScore} icon="📊" color="#10b981" sub="out of 100" />
+        <StatCard label="Low Risk" value={lowRisk} icon="🔵" color="#22d3ee" />
+        <StatCard label="No Risk" value={noRisk} icon="🟢" color="#10b981" sub="Excellent" />
+        <StatCard label="Average Score" value={avgScore} icon="📊" color="#a78bfa" sub="out of 100" />
       </div>
 
       {/* New: Model metrics + Analytics KPIs */}
@@ -155,15 +181,23 @@ export default function AdminDashboard() {
             )}
           </div>
           <div style={{ background: "var(--panel-bg)", border: "1px solid var(--border-color)", borderRadius: 12, padding: 12 }}>
-            <h4 style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700 }}>Top High-Risk</h4>
+            <h4 style={{ margin: 0, fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 700 }}>🚨 Top High-Risk</h4>
             <div style={{ marginTop: 8 }}>
-              {(analytics.top_high_risk_students || []).slice(0,5).map(s => (
-                <div key={s.student_id} style={{ padding: 6, borderBottom: "1px solid rgba(255,255,255,0.02)", display: "flex", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: "0.9rem" }}>{s.name}</div>
-                  <div style={{ fontWeight: 700, color: "#ef4444" }}>{Math.round(s.avg_score || 0)}</div>
-                </div>
-              ))}
-              {!analytics.top_high_risk_students?.length && <div style={{ color: "#64748b" }}>No high-risk students yet.</div>}
+              {(analytics.top_high_risk_students || []).length > 0
+                ? (analytics.top_high_risk_students).slice(0, 5).map(s => (
+                  <div key={s.student_id} style={{ padding: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
+                      <div style={{ fontSize: "0.73rem", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</div>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: "right" }}>
+                      <div style={{ fontWeight: 700, color: "#ef4444", fontSize: "1rem" }}>{Math.round(s.avg_score || 0)}</div>
+                      <div style={{ fontSize: "0.68rem", color: "#f87171", background: "rgba(239,68,68,0.15)", borderRadius: 4, padding: "1px 5px", marginTop: 2 }}>High Risk</div>
+                    </div>
+                  </div>
+                ))
+                : <div style={{ color: "#64748b", fontSize: "0.83rem", paddingTop: 4 }}>No high-risk students found.</div>
+              }
             </div>
           </div>
         </div>

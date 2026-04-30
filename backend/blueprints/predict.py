@@ -1,6 +1,6 @@
 """
-predict.py — Step 8: Modular REST API Structuring & Step 7: Bulk CSV Upload
-Prediction and Classification Blueprint
+predict.py — Prediction & Classification Blueprint
+Includes full Explainable AI (XAI) response payload.
 """
 
 import os, io
@@ -16,6 +16,13 @@ from database.db_config import get_connection, get_or_create_student
 from model.train_model import classify_risk
 from model.shap_explainer import explain_instance
 from utils.security import sanitize_string
+from utils.insights_engine import (
+    get_risk_severity,
+    generate_explanation,
+    generate_impact_analysis,
+    generate_recommendations,
+    simulate_whatif,
+)
 
 predict_bp = Blueprint("predict", __name__, url_prefix="/api/predict")
 
@@ -75,12 +82,12 @@ def predict():
         asn = float(data.get("assignment", data.get("assignment_score", 0)))
         im = float(data.get("internal", data.get("internal_marks", 0)))
 
-        # Basic range checks
-        if not (0 <= att <= 100): return jsonify({"error": "Attendance must be 0-100"}), 400
-        if not (0 <= sh  <= 24):  return jsonify({"error": "Study hours must be 0-24"}), 400
-        if not (0 <= pm  <= 100): return jsonify({"error": "Previous marks must be 0-100"}), 400
-        if not (0 <= asn <= 100): return jsonify({"error": "Assignment score must be 0-100"}), 400
-        if not (0 <= im  <= 100): return jsonify({"error": "Internal marks must be 0-100"}), 400
+        # Range validation — full 0–100 academic spectrum
+        if not (0 <= att <= 100): return jsonify({"error": "Attendance must be 0–100"}), 400
+        if not (0 <= sh  <= 10):  return jsonify({"error": "Study hours must be 0–10"}), 400
+        if not (0 <= pm  <= 100): return jsonify({"error": "Previous marks must be 0–100"}), 400
+        if not (0 <= asn <= 100): return jsonify({"error": "Assignment score must be 0–100"}), 400
+        if not (0 <= im  <= 100): return jsonify({"error": "Internal marks must be 0–100"}), 400
 
         # Build feature vector using meta feature ordering
         feat_names = _meta.get("features", ["attendance", "study_hours", "prev_marks", "assignment", "internal"])
@@ -114,28 +121,22 @@ def predict():
         risk = classify_risk(score)
         conf = _compute_confidence(rf_pred, xgb_pred)
 
-        # SHAP explanation using XGBoost if available, else RF
+        # ── XAI Insights ──────────────────────────────────────────────────
+        risk_severity    = get_risk_severity(risk)
+        narrative        = generate_explanation(att, sh, pm, asn, im, score)
+        impact_analysis  = generate_impact_analysis(att, sh, pm, asn, im)
+        recommendations  = generate_recommendations(att, sh, pm, asn, im, score)
+        what_if          = simulate_whatif(
+            att, sh, pm, asn, im,
+            _rf_model, _xgb_model, _scaler, feat_names,
+            classify_risk
+        )
+
+        # ── SHAP explanation (optional, kept for feature-importance chart) ─
         explainer_model = _xgb_model if _xgb_model is not None else _rf_model
-        explanation = explain_instance(explainer_model, _scaler, X.flatten(), feat_names, top_n=3)
+        shap_data = explain_instance(explainer_model, _scaler, X.flatten(), feat_names, top_n=5)
 
-        # ---- Rule-based override (hybrid ML + rules)
-        override_applied = False
-        try:
-            # NO-RISK CONDITIONS:
-            # attendance >= 85, study_hours >= 5, prev_marks >= 70, assignment >= 80, internal >= 80
-            if (att >= 85 and sh >= 5 and pm >= 70 and asn >= 80 and im >= 80):
-                override_applied = True
-                risk = "No Risk"
-                # Ensure explanation is a dict and inject human-friendly reasons
-                if not isinstance(explanation, dict):
-                    explanation = {"top_reasons": [], "improvements": []}
-                explanation["top_reasons"] = ["Strong Attendance", "Good Marks", "Consistent Performance"]
-                explanation["improvements"] = ["Keep maintaining your performance"]
-        except Exception:
-            # Non-fatal — keep ML prediction if rule check errors
-            override_applied = False
-
-        # Database Storage
+        # ── Persist to DB ──────────────────────────────────────────────────
         conn   = get_connection()
         cursor = conn.cursor()
         sid    = get_or_create_student(cursor, name, email)
@@ -146,39 +147,37 @@ def predict():
             (sid, att, sh, pm, asn, im)
         )
         cursor.execute(
-            "INSERT INTO predictions (student_id,user_id,attendance,study_hours,previous_marks,assignment_score,internal_marks,predicted_score,risk_level,confidence) "
+            "INSERT INTO predictions (student_id,user_id,attendance,study_hours,previous_marks,"
+            "assignment_score,internal_marks,predicted_score,risk_level,confidence) "
             "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (sid, user_id, att, sh, pm, asn, im, score, risk, conf)
         )
         conn.commit()
         cursor.close(); conn.close()
 
-        # Recommendations
-        recs = {"study_plan": [], "weekly_target": None, "focus_areas": []}
-        if att < 75:
-            recs["study_plan"].append("Increase attendance to 75%+")
-        if sh < 5:
-            recs["study_plan"].append("Study at least 5 hours daily")
-            recs["weekly_target"] = "Study at least 35 hours per week"
-        else:
-            recs["weekly_target"] = f"Maintain {sh} hours per day"
-        if pm < 50:
-            recs["focus_areas"].append("Revise core subjects")
         response_payload = {
-            "name": name,
-            "email": email,
-            "attendance": att,
-            "study_hours": sh,
-            "previous_marks": pm,
-            "assignment_score": asn,
-            "internal_marks": im,
-            "predicted_score": score,
-            "risk_level": risk,
-            "confidence": conf,
-            "override_applied": bool(override_applied),
-            "explanation": explanation,
-            "recommendations": recs,
+            # ── Core ──
+            "name":              name,
+            "email":             email,
+            "attendance":        att,
+            "study_hours":       sh,
+            "previous_marks":    pm,
+            "assignment_score":  asn,
+            "internal_marks":    im,
+            "predicted_score":   score,
+            "risk_level":        risk,
+            "risk_severity":     risk_severity,
+            "confidence":        conf,
+            # ── XAI ──
+            "explanation": {
+                "narrative":        narrative,
+                "impact_analysis":  impact_analysis,
+                "recommendations":  recommendations,
+                "what_if":          what_if,
+            },
+            # ── SHAP chart data ──
             "feature_importance": _meta.get("feature_importance", {}),
+            "shap_detail":        shap_data,
         }
 
         return jsonify(response_payload), 200
@@ -342,28 +341,34 @@ def explain_prediction(pred_id):
         X = np.array([[fmap.get(fn, 0) for fn in feat_names]])
         X_sc = _scaler.transform(X)
 
+        # ── XAI Insights ──────────────────────────────────────────────────
+        risk        = classify_risk(float(score))
+        risk_severity   = get_risk_severity(risk)
+        narrative       = generate_explanation(att, sh, pm, asn, im, float(score))
+        impact_analysis = generate_impact_analysis(att, sh, pm, asn, im)
+        recommendations = generate_recommendations(att, sh, pm, asn, im, float(score))
+        what_if         = simulate_whatif(
+            att, sh, pm, asn, im,
+            _rf_model, _xgb_model, _scaler, feat_names,
+            classify_risk
+        )
         explainer_model = _xgb_model if _xgb_model is not None else _rf_model
-        explanation = explain_instance(explainer_model, _scaler, X.flatten(), feat_names, top_n=3)
-
-        # Recommendations (same logic as predict)
-        recs = {"study_plan": [], "weekly_target": None, "focus_areas": []}
-        if att < 75:
-            recs["study_plan"].append("Increase attendance to 75%+")
-        if sh < 5:
-            recs["study_plan"].append("Study at least 5 hours daily")
-            recs["weekly_target"] = "Study at least 35 hours per week"
-        else:
-            recs["weekly_target"] = f"Maintain {sh} hours per day"
-        if pm < 50:
-            recs["focus_areas"].append("Revise core subjects")
+        shap_data = explain_instance(explainer_model, _scaler, X.flatten(), feat_names, top_n=5)
 
         cursor.close(); conn.close()
 
         return jsonify({
-            "prediction_id": pred_id,
+            "prediction_id":  pred_id,
             "predicted_score": float(score),
-            "explanation": explanation,
-            "recommendations": recs
+            "risk_level":      risk,
+            "risk_severity":   risk_severity,
+            "explanation": {
+                "narrative":        narrative,
+                "impact_analysis":  impact_analysis,
+                "recommendations":  recommendations,
+                "what_if":          what_if,
+            },
+            "shap_detail": shap_data,
         }), 200
 
     except Exception as e:
