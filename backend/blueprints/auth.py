@@ -127,7 +127,7 @@ This OTP is valid for 5 minutes.
 Thank you!
 """     
         print("========== BEFORE send_email ==========")
-        raise Exception("TEST BEFORE SEND_EMAIL")
+        
         email_sent = send_email(email, subject, body)
         print("========== AFTER send_email ==========")
 
