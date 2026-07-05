@@ -126,12 +126,14 @@ This OTP is valid for 5 minutes.
 
 Thank you!
 """
+        print("========== BEFORE send_email ==========")
+        email_sent = send_email(email, subject, body)
+        print("========== AFTER send_email ==========")
 
-        #email_sent = send_email(email, subject, body)
-        email_sent = False
-
-        if not email_sent:
-            print("⚠️ OTP email could not be sent, but user has been registered.")
+        if email_sent:
+            print("✅ OTP email sent successfully.")
+        else:
+            print("⚠️ OTP email could not be sent.")
 
         return jsonify({
             "message": "User registered successfully",
