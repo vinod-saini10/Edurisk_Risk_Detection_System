@@ -1,9 +1,10 @@
 import axios from "axios";
+console.log("API URL:", process.env.REACT_APP_API_URL);
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = process.env.REACT_APP_API_URL;
 
 const api = axios.create({
-  baseURL: API_BASE
+  baseURL: API_BASE,
 });
 
 // 🔥 REQUEST INTERCEPTOR: Attach token to every request
@@ -17,7 +18,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 // 🔒 RESPONSE INTERCEPTOR: Handle expired / invalid tokens globally
@@ -35,7 +36,7 @@ api.interceptors.response.use(
     }
     // 403 (admin role required) — let the calling component handle it
     return Promise.reject(error);
-  }
+  },
 );
 
 // --- AUTH ---
@@ -57,7 +58,7 @@ export const getProfile = () => api.get("/auth/profile");
 export const predictStudent = (data) => api.post("/predict", data);
 export const uploadBulkCSV = (formData) =>
   api.post("/predict/bulk", formData, {
-    headers: { "Content-Type": "multipart/form-data" }
+    headers: { "Content-Type": "multipart/form-data" },
   });
 export const getModelInfo = () => api.get("/predict/info");
 
@@ -67,13 +68,19 @@ export const getPrevious = (data) => api.post("/history/previous", data);
 
 // --- STUDENT ---
 export const getStudentPredictions = () => api.get("/student/predictions");
-export const exportStudentPredictions = () => api.get("/student/predictions/export", { responseType: "blob" });
+export const exportStudentPredictions = () =>
+  api.get("/student/predictions/export", { responseType: "blob" });
 export const getStudentProfile = () => api.get("/student/profile");
-export const upsertStudentProfile = (data) => api.post("/student/profile", data);
-export const uploadProfileImage = (formData) => api.post("/student/profile/photo", formData, { headers: { "Content-Type": "multipart/form-data" } });
+export const upsertStudentProfile = (data) =>
+  api.post("/student/profile", data);
+export const uploadProfileImage = (formData) =>
+  api.post("/student/profile/photo", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
 // Explain a historical prediction by id
-export const explainPrediction = (predictionId) => api.get(`/predict/explain/${predictionId}`);
+export const explainPrediction = (predictionId) =>
+  api.get(`/predict/explain/${predictionId}`);
 
 // --- ADMIN ---
 export const getAdminCharts = () => api.get("/admin/charts");
@@ -98,5 +105,4 @@ export const logoutUser = () => {
 export default api;
 
 // --- Notifications ---
-export const sendEmailAlert = (data) =>
-  api.post("/notify/email", data);
+export const sendEmailAlert = (data) => api.post("/notify/email", data);

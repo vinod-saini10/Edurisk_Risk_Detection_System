@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../api/api";
 
 export default function OtpPage() {
   const [otp, setOtp] = useState("");
@@ -37,16 +37,16 @@ export default function OtpPage() {
     setError("");
 
     try {
-      await axios.post(
-        "http://localhost:5000/api/auth/verify-otp",
-        { email, otp }
-      );
+      console.log("OTP PAGE NEW BUILD");
+      await api.post("/auth/verify-otp", {
+        email,
+        otp,
+      });
 
       alert("✅ OTP Verified Successfully");
 
       // 🔥 redirect to login
       nav("/login");
-
     } catch (err) {
       setError(err.response?.data?.error || "Invalid OTP");
     } finally {
@@ -55,23 +55,26 @@ export default function OtpPage() {
   };
 
   return (
-    <div style={{
-      minHeight: "80vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "2rem"
-    }}>
-      <div style={{
-        width: "100%",
-        maxWidth: 400,
+    <div
+      style={{
+        minHeight: "80vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         padding: "2rem",
-        borderRadius: 16,
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        textAlign: "center"
-      }}>
-
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          padding: "2rem",
+          borderRadius: 16,
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          textAlign: "center",
+        }}
+      >
         <h2>🔐 Verify OTP</h2>
 
         <p style={{ color: "#94a3b8" }}>
@@ -79,7 +82,6 @@ export default function OtpPage() {
         </p>
 
         <form onSubmit={handleVerify}>
-
           <input
             type="text"
             maxLength={6}
@@ -94,7 +96,7 @@ export default function OtpPage() {
               border: "1px solid #ccc",
               textAlign: "center",
               fontSize: "1.2rem",
-              letterSpacing: "5px"
+              letterSpacing: "5px",
             }}
           />
 
@@ -109,20 +111,14 @@ export default function OtpPage() {
               border: "none",
               background: loading ? "#888" : "#4f46e5",
               color: "#fff",
-              cursor: loading ? "not-allowed" : "pointer"
+              cursor: loading ? "not-allowed" : "pointer",
             }}
           >
             {loading ? "Verifying..." : "Verify OTP"}
           </button>
-
         </form>
 
-        {error && (
-          <p style={{ color: "red", marginTop: "1rem" }}>
-            ⚠ {error}
-          </p>
-        )}
-
+        {error && <p style={{ color: "red", marginTop: "1rem" }}>⚠ {error}</p>}
       </div>
     </div>
   );
