@@ -23,7 +23,7 @@ def send_email(to_email, subject, body):
     except Exception as e:
         import traceback
 
-        print("\n========== RESEND ERROR ==========")
+        print("\n========== RESEND ERRORrrrr ==========")
         traceback.print_exc()
         print(type(e).__name__)
         print(e)
