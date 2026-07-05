@@ -4,6 +4,7 @@ from email.mime.text import MIMEText
 
 
 def send_email(to_email, subject, body):
+    print("******** send_email() CALLED ********")
     try:
 
         MAIL_USER = os.getenv("MAIL_USER")
