@@ -116,18 +116,37 @@ def register():
 
         cursor.close(); conn.close()
 
-        # 🔥 Send Email ONLY 
+             # 🔥 Send OTP Email (Don't fail registration if email fails)
         subject = "EduRisk OTP Verification"
-        body = f"Hello {name},\n\nYour OTP for registration is: {otp}\nThis OTP is valid for 5 minutes.\n\nThank you!"
-        send_email(email, subject, body)
+        body = f"""Hello {name},
 
-        return jsonify({"message": "User registered successfully", "user_id": user_id}), 201
+Your OTP for registration is: {otp}
+
+This OTP is valid for 5 minutes.
+
+Thank you!
+"""
+
+        #email_sent = send_email(email, subject, body)
+        email_sent = False
+
+        if not email_sent:
+            print("⚠️ OTP email could not be sent, but user has been registered.")
+
+        return jsonify({
+            "message": "User registered successfully",
+            "user_id": user_id,
+            "email_sent": email_sent
+        }), 201
 
     except Error as e:
         if "Duplicate entry" in str(e):
             return jsonify({"error": "Email already registered"}), 409
         return jsonify({"error": str(e)}), 500
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print("Register error:", e)
         return jsonify({"error": str(e)}), 500
 

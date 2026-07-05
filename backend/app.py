@@ -40,10 +40,15 @@ def create_app():
     # ─────────────────────────────
     # 🔹 1. CORS CONFIG
     # ─────────────────────────────
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
     CORS(
         app,
         supports_credentials=True,
-        origins=["http://localhost:3000"],
+        origins=[
+            "http://localhost:3000",
+            frontend_url,
+        ],
         allow_headers=["Authorization", "Content-Type", "Accept"],
         expose_headers=["Authorization"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
@@ -157,7 +162,7 @@ def create_app():
     def health():
         return {
             "status": "healthy",
-            "env_loaded": bool(os.getenv("vinod.saini24@pcu.edu.in")),
+            "env_loaded": bool(os.getenv("MAIL_USER")),
             "models": {
                 "rf": True,
                 "xgb": bool(meta.get("xgb_metrics"))
