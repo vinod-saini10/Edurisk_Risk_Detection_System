@@ -1,17 +1,22 @@
 """
 student.py — Student-facing endpoints for personal predictions and export
 """
-
+from utils.logger import logger
 import io
 import os
 import time
 import csv
-from flask import Blueprint, jsonify, send_file, request
+from flask import request, jsonify,send_file
+from apiflask import APIBlueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from mysql.connector import Error
 from database.db_config import get_connection
 from utils.security import sanitize_string
 from werkzeug.utils import secure_filename
+from docs.student_schema import (
+    StudentProfileSchema,
+    StudentUpdateSchema
+)
 
 
 def _ensure_profile_columns(cursor):
@@ -25,24 +30,34 @@ def _ensure_profile_columns(cursor):
         if cursor.fetchone() is None:
             try:
                 cursor.execute("ALTER TABLE student_profiles ADD COLUMN image_url VARCHAR(512) NULL")
-                print("[DB] Added column image_url to student_profiles (runtime)")
+                logger.info("Added image_url column to student_profiles.")
             except Exception as _e:
-                print("[DB] Failed to add image_url at runtime:", _e)
+                logger.exception("Failed to add image_url column.")
 
         cursor.execute("SHOW COLUMNS FROM student_profiles LIKE 'updated_at'")
         if cursor.fetchone() is None:
             try:
                 cursor.execute("ALTER TABLE student_profiles ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-                print("[DB] Added column updated_at to student_profiles (runtime)")
+                logger.info("Added updated_at column to student_profiles.")
             except Exception as _e:
-                print("[DB] Failed to add updated_at at runtime:", _e)
+                logger.exception("Failed to add updated_at column.")
     except Exception as e:
-        print("[DB] _ensure_profile_columns skipped:", e)
+        logger.exception("Runtime profile column check failed.")
 
-student_bp = Blueprint("student", __name__, url_prefix="/api/student")
+student_bp = APIBlueprint(
+    "student",
+    __name__,
+    url_prefix="/api/student",
+    tag="Student"
+)
 
-
-@student_bp.route("/predictions", methods=["GET"])
+#__________________________________Documentation api____________
+@student_bp.get("/predictions")
+@student_bp.doc(
+    tags=["Student"],
+    summary="Prediction History",
+    description="Returns all predictions of the authenticated student."
+)
 @jwt_required()
 def get_my_predictions():
     identity = get_jwt_identity()
@@ -112,8 +127,13 @@ def get_my_predictions():
             except Exception:
                 pass
 
-
-@student_bp.route("/predictions/export", methods=["GET"])
+#__________________________________________documentation api____________
+@student_bp.get("/predictions/export")
+@student_bp.doc(
+    tags=["Student"],
+    summary="Export Prediction History",
+    description="Download prediction history as CSV."
+)
 @jwt_required()
 def export_my_predictions():
     identity = get_jwt_identity()
@@ -159,7 +179,10 @@ def export_my_predictions():
         return send_file(mem, mimetype="text/csv", as_attachment=True, download_name="my_predictions.csv")
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            import traceback
+            traceback.print_exc()          # Full error terminal me print karega
+            logger.exception("CSV Export Failed")
+            return jsonify({"error": str(e)}), 500
     finally:
         if cursor:
             try:
@@ -173,7 +196,14 @@ def export_my_predictions():
                 pass
 
 
-@student_bp.route("/profile", methods=["GET"]) 
+@student_bp.get("/profile")
+@student_bp.doc(
+    tags=["Student"],
+    summary="Get Student Profile",
+    description="Returns the authenticated student's profile.",
+    security=[{"BearerAuth": []}]
+)
+@student_bp.output(StudentProfileSchema)
 @jwt_required()
 def get_profile():
     identity = get_jwt_identity()
@@ -193,20 +223,25 @@ def get_profile():
                 res = {
                     "name": row[0], "email": row[1], "course": row[2], "semester": row[3], "image_url": row[4], "updated_at": str(row[5]) if row[5] else None
                 }
-                return jsonify(res), 200
+                return res
         except Exception as e:
             # If SELECT failed due to missing columns, fall back to safer query
-            print("[PROFILE] SELECT with image_url failed, falling back:", e)
+            logger.warning(
+                 "Profile query fallback activated because image_url could not be read."
+                            )
 
         # Fallback to users table
         cursor.execute("SELECT name, email FROM users WHERE id=%s LIMIT 1", (user_id,))
         u = cursor.fetchone()
         if not u:
-            return jsonify({"error": "User not found"}), 404
-        return jsonify({"name": u[0], "email": u[1]}), 200
+            return {"error": "User not found"}, 404
+        return {
+        "name": u[0],
+        "email": u[1]
+                }
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
     finally:
         if cursor:
             try:
@@ -219,22 +254,25 @@ def get_profile():
             except Exception:
                 pass
 
-
-@student_bp.route("/profile", methods=["POST", "PUT"]) 
+#_____________________________________________________Documentation api testing remaining____________
+@student_bp.route("/profile", methods=["POST", "PUT"])
+@student_bp.doc(
+    tags=["Student"],
+    summary="Create or Update Profile",
+    description="Create or update student profile information."
+)
+@student_bp.input(StudentUpdateSchema)
+@student_bp.output(StudentProfileSchema)
 @jwt_required()
-def upsert_profile():
+def upsert_profile(json_data):
     identity = get_jwt_identity()
     user_id = identity.get("id") if isinstance(identity, dict) else identity
 
     # Accept both JSON and form data (form-data used by registration flow)
-    data = {}
-    try:
-        data = request.get_json(force=False) or {}
-    except Exception:
-        data = {}
-    # merge form fields if present
+    data = json_data or {}
+
     if not data and request.form:
-        data = request.form.to_dict()
+     data = request.form.to_dict()
 
     name = sanitize_string(data.get("name", ""))
     email = sanitize_string(data.get("email", ""))
@@ -269,7 +307,9 @@ def upsert_profile():
         except Exception as e:
             # Fallback if image_url column missing or other schema issue: retry without image_url
             msg = str(e)
-            print("[PROFILE] Upsert failed, retrying without image_url:", msg)
+            logger.warning(
+                    "Profile update retried without image_url."
+                            )
             if row:
                 cursor.execute("UPDATE student_profiles SET name=%s, email=%s, course=%s, semester=%s WHERE user_id=%s", (name, email, course, semester, user_id))
             else:
@@ -297,8 +337,13 @@ def upsert_profile():
             except Exception:
                 pass
 
-
-@student_bp.route("/profile/photo", methods=["POST"]) 
+#______________________________________doucmenattaion api________
+@student_bp.post("/profile/photo")
+@student_bp.doc(
+    tags=["Student"],
+    summary="Upload Profile Image",
+    description="Upload profile image for authenticated student."
+)
 @jwt_required()
 def upload_profile_image():
     identity = get_jwt_identity()
@@ -358,7 +403,9 @@ def upload_profile_image():
         except Exception as e:
             # If image_url column still missing, log and ensure a profile row exists (without image)
             msg = str(e)
-            print("[PROFILE IMAGE] DB update failed, will ensure profile row exists without image_url:", msg)
+            logger.warning(
+                    "Profile image could not be stored in DB. Created profile without image."
+                        )
             if not row:
                 cursor.execute("SELECT name, email FROM users WHERE id=%s LIMIT 1", (user_id,))
                 u = cursor.fetchone()

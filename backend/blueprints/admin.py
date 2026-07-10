@@ -1,8 +1,17 @@
 """
 admin.py — FINAL (JWT + Admin Secure + Export Fixed)
 """
-
-from flask import Blueprint, jsonify, Response
+from docs.admin_schema import (
+    AdminUserSchema,
+    AnalyticsSchema,
+    InsightsSchema,
+    ModelMetricsSchema,
+    AdminMessageSchema,
+    PredictionSchema,
+    ChartsSchema,
+)
+from flask import jsonify, Response
+from apiflask import APIBlueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from mysql.connector import Error
 from database.db_config import get_connection
@@ -14,11 +23,22 @@ import numpy as np
 from model.train_model import META_PATH
 import os
 
-admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
+admin_bp = APIBlueprint(
+    "admin",
+    __name__,
+    url_prefix="/api/admin",
+    tag="Admin"
+)
 
 
 # ───────────────── USERS ─────────────────
-@admin_bp.route("/users", methods=["GET"])
+@admin_bp.get("/users")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="List Users",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(AdminUserSchema(many=True))
 @admin_required()
 def list_users():
     try:
@@ -42,21 +62,27 @@ def list_users():
         for u in users:
             u["created_at"] = str(u["created_at"])
 
-        return jsonify(users), 200
+        return users
 
     except Error as e:
         return jsonify({"error": str(e)}), 500
 
 
-@admin_bp.route("/analytics", methods=["GET"])
+@admin_bp.get("/analytics")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="Analytics Dashboard",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(AnalyticsSchema)
 @admin_required()
 def analytics():
-    """Return aggregated metrics suitable for BI tools / Power BI (admin-only)."""
     try:
         data = compute_analytics()
-        return jsonify(data), 200
+        print(data)
+        return data
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 
 def compute_analytics():
@@ -143,8 +169,14 @@ def compute_analytics():
         "top_high_risk_students": top_high_risk_students,
     }
 
-
-@admin_bp.route("/insights", methods=["GET"])
+# _______________________________Insights_________________________
+@admin_bp.get("/insights")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="AI Insights",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(InsightsSchema)
 @admin_required()
 def insights():
     """Generate AI-driven human-readable insights from prediction data."""
@@ -217,34 +249,48 @@ def insights():
             insights_list.append("No strong patterns detected — data looks balanced.")
 
         cursor.close(); conn.close()
-        return jsonify({"insights": insights_list}), 200
+        return {"insights": insights_list},200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
+#____________________________________model metrics_____________
+@admin_bp.get("/model-metrics")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="Model Metrics",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(ModelMetricsSchema)
 
-@admin_bp.route("/model-metrics", methods=["GET"])
 @admin_required()
 def model_metrics():
     """Return stored model metrics computed during training (rf/xgb)."""
     try:
         if not META_PATH or not os.path.exists(META_PATH):
-            return jsonify({"error": "Model metadata not available"}), 404
+            return {"error": "Model metadata not available"}, 404
 
         with open(META_PATH) as f:
             meta = json.load(f)
 
         rf = meta.get("rf_metrics")
         xgb = meta.get("xgb_metrics")
-        return jsonify({"rf": rf, "xgb": xgb}), 200
+        return {"rf": rf, "xgb": xgb}, 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 
 # ───────────────── DELETE USER ─────────────────
-@admin_bp.route("/user/<int:user_id>", methods=["DELETE"])
+@admin_bp.delete("/user/<int:user_id>")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="Delete User",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(AdminMessageSchema)
 @admin_required()
+
 def delete_user(user_id):
     try:
         conn = get_connection()
@@ -261,15 +307,22 @@ def delete_user(user_id):
         cursor.close()
         conn.close()
 
-        return jsonify({"message": f"User {user_id} deleted successfully"}), 200
+        return {"message": f"User {user_id} deleted successfully"}, 200
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 
 # ───────────────── ALL PREDICTIONS ─────────────────
-@admin_bp.route("/predictions", methods=["GET"])
+@admin_bp.get("/predictions")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="All Predictions",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(PredictionSchema(many=True))
 @admin_required()
+
 def all_predictions():
     try:
         conn = get_connection()
@@ -299,15 +352,22 @@ def all_predictions():
             d["created_at"] = str(d["created_at"])
             data.append(d)
 
-        return jsonify(data), 200
+        return data
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 
 # ───────────────── CHART DATA ─────────────────
-@admin_bp.route("/charts", methods=["GET"])
+@admin_bp.get("/charts")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="Chart Data",
+    security=[{"BearerAuth": []}]
+)
+@admin_bp.output(ChartsSchema)
 @admin_required()   # 🔥 JWT + Role check handled here
+
 def admin_charts():
     try:
         conn = get_connection()
@@ -333,18 +393,25 @@ def admin_charts():
         cursor.close()
         conn.close()
 
-        return jsonify({
-            "risk_distribution": risk_dist,
-            "avg_score_by_risk": avg_score
-        }), 200
+        return {
+    "risk_distribution": risk_dist,
+    "avg_score_by_risk": avg_score
+}
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)},500
 
 
 # ───────────────── EXPORT CSV ─────────────────
-@admin_bp.route("/export", methods=["GET"])
+@admin_bp.get("/export")
+@admin_bp.doc(
+    tags=["Admin"],
+    summary="Export CSV",
+    description="Download all prediction data as a CSV file.",
+    security=[{"BearerAuth": []}]
+)
 @admin_required()
+
 def export_csv():
     try:
         conn = get_connection()

@@ -6,7 +6,7 @@ Trains RandomForest and XGBoost regressors on a provided CSV dataset
 and metadata under backend/models/. Exposes `load_model()` which returns
 both models, scaler, and meta.
 """
-
+from utils.logger import logger
 import os
 import json
 import numpy as np
@@ -187,14 +187,16 @@ def train(force_regenerate: bool = False):
     with open(META_PATH, "w") as f:
         json.dump(meta, f, indent=2)
 
-    print(f"[ML] Saved models -> {RF_PATH}, {XGB_PATH if xgb is not None else '(no xgb)'}")
+    logger.info(
+    f"Models saved successfully. RF={RF_PATH}, XGB={'Saved' if xgb is not None else 'Not Trained'}"
+                )
     return rf, xgb, scaler, meta
 
 
 def load_model():
     need_train = not (os.path.exists(RF_PATH) and os.path.exists(SCALER_PATH) and os.path.exists(META_PATH))
     if need_train:
-        print("[ML] Artifacts missing -- training now...")
+        logger.warning("Model artifacts not found. Starting model training...")
         return train()
 
     rf = joblib.load(RF_PATH)
@@ -209,7 +211,11 @@ def load_model():
     with open(META_PATH) as f:
         meta = json.load(f)
 
-    print(f"[ML] Loaded models. RF R²={meta.get('rf_metrics',{}).get('r2','?')}, XGB present={xgb is not None}")
+    logger.info(
+    f"Models loaded successfully. "
+    f"RF R²={meta.get('rf_metrics', {}).get('r2', '?')}, "
+    f"XGB={'Available' if xgb is not None else 'Not Available'}"
+)
     return rf, xgb, scaler, meta
 
 

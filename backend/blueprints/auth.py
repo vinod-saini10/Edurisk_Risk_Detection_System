@@ -1,6 +1,8 @@
+from utils.logger import logger
 import random
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import request, jsonify
+from apiflask import APIBlueprint
 import os
 import time
 from werkzeug.utils import secure_filename
@@ -10,8 +12,21 @@ from mysql.connector import Error
 from database.db_config import get_connection
 from utils.security import sanitize_string
 from utils.email_service import send_email
-
-auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+from docs.auth_schema import (
+    RegisterSchema,
+    VerifyOTPSchema,
+    LoginSchema,
+    RegisterResponseSchema,
+    LoginResponseSchema,
+    MessageSchema,
+    ProfileSchema,
+)
+auth_bp = APIBlueprint(
+    "auth",
+    __name__,
+    url_prefix="/api/auth",
+    tag="Authentication"
+)
 _bcrypt = Bcrypt()
 
 def init_bcrypt(bcrypt_instance):
@@ -33,14 +48,24 @@ def _user_by_email(cursor, email):
     return cursor.fetchone()
 
 # 🔹 REGISTER API
-@auth_bp.route("/register", methods=["POST"])
-def register():
+@auth_bp.post("/register")
+@auth_bp.doc(
+    tags=["Authentication"],
+    summary="Register User",
+    description="Register a new user and send OTP email."
+)
+@auth_bp.input(RegisterSchema)
+@auth_bp.output(RegisterResponseSchema, status_code=201)
+def register(json_data):
+    #print("REGISTER API HIT") # for debugging only
+
+
     try:
         # Support both JSON and multipart/form-data (for profile image)
         if request.content_type and request.content_type.startswith('multipart/form-data'):
             data = {**request.form}
         else:
-            data = request.get_json(force=True) or {}
+            data = json_data
         err = _require(data, "name", "email", "password")
         if err:
             return jsonify({"error": err}), 400
@@ -70,8 +95,8 @@ def register():
         is_verified = 0
 
         # Debug Logs
-        print("OTP:", otp)
-        print("EMAIL:", email)
+        logger.info(f"OTP generated for {email}.")
+        logger.info(f"Registration initiated for {email}.")
 
         conn = get_connection()
         cursor = conn.cursor()
@@ -126,38 +151,45 @@ This OTP is valid for 5 minutes.
 
 Thank you!
 """     
-        print("========== BEFORE send_email ==========")
+        logger.info("Sending OTP email...") # for debugging only
         
         email_sent = send_email(email, subject, body)
-        print("========== AFTER send_email ==========")
+        #print("========== AFTER send_email ==========") # for debugging only
 
         if email_sent:
-            print("✅ OTP email sent successfully.")
+            logger.info(f"OTP email sent to {email}.")
         else:
-            print("⚠️ OTP email could not be sent.")
+            logger.warning(f"Failed to send OTP email to {email}.")
 
-        return jsonify({
-            "message": "User registered successfully",
-            "user_id": user_id,
-            "email_sent": email_sent
-        }), 201
-
+        return {
+        "message": "User registered successfully",
+        "user_id": user_id,
+        "email_sent": email_sent
+}
+# ___________________________TEmp___________________
     except Error as e:
+        print("MYSQL ERROR:", repr(e))
+        print("MYSQL ERROR STRING:", str(e))
         if "Duplicate entry" in str(e):
-            return jsonify({"error": "Email already registered"}), 409
-        return jsonify({"error": str(e)}), 500
+            return {"error": "Email already registered"}, 409
+        return {"error": str(e)}, 500
 
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        print("Register error:", e)
+        logger.exception("Registration failed.")
         return jsonify({"error": str(e)}), 500
 
-# 🔹 VERIFY OTP API
-@auth_bp.route("/verify-otp", methods=["POST"])
-def verify_otp():
+# 🔹 ________________________VERIFY OTP API______________________
+@auth_bp.post("/verify-otp")
+@auth_bp.doc(
+    tags=["Authentication"],
+    summary="Verify OTP"
+)
+@auth_bp.input(VerifyOTPSchema)
+@auth_bp.output(MessageSchema)
+def verify_otp(json_data):
     try:
-        data = request.get_json(force=True) or {}
+        data = json_data
         email = data.get("email")
         otp = data.get("otp")
 
@@ -191,17 +223,23 @@ def verify_otp():
         conn.commit()
         cursor.close(); conn.close()
 
-        return jsonify({"message": "OTP verified successfully"}), 200
+        return {"message": "OTP verified successfully"}
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 
-# 🔹 LOGIN API
-@auth_bp.route("/login", methods=["POST"])
-def login():
+# 🔹 ______________________LOGIN API____________________
+@auth_bp.post("/login")
+@auth_bp.doc(
+    tags=["Authentication"],
+    summary="Login"
+)
+@auth_bp.input(LoginSchema)
+@auth_bp.output(LoginResponseSchema)
+def login(json_data):
     try:
-        data = request.get_json(force=True) or {}
+        data = json_data
         err = _require(data, "email", "password")
         if err:
             return jsonify({"error": err}), 400
@@ -215,9 +253,13 @@ def login():
         cursor.close(); conn.close()
 
         if not row or not _bcrypt.check_password_hash(row[3], password):
+            logger.warning(f"Invalid login attempt for {email}.")
             return jsonify({"error": "Invalid email or password"}), 401
             
         is_verified = row[5]
+        logger.warning(
+            f"Login blocked: Email not verified. UserID={row[0]}"
+                        )
         if is_verified == 0:
             return jsonify({"error": "Please verify your email first"}), 401
 
@@ -230,8 +272,12 @@ def login():
             identity=str(user_id),
             additional_claims={"role": role, "name": name}
         )
+        
+        logger.info(
+            f"User logged in successfully. UserID={user_id}, Role={role}"
+                    )
 
-        return jsonify({
+        return {
             "access_token": token,
             "user": {
                 "id":    row[0],
@@ -239,38 +285,53 @@ def login():
                 "email": row[2],
                 "role":  row[4]
             }
-        }), 200
+        }
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
-# 🔹 PROFILE API
-@auth_bp.route("/profile", methods=["GET"])
+# 🔹 ______________________________PROFILE API______________________
+
+@auth_bp.get("/profile")
+@auth_bp.doc(
+    tags=["Authentication"],
+    summary="User Profile",
+    security=[{"BearerAuth": []}]
+)
+@auth_bp.output(ProfileSchema)
 @jwt_required()
 def profile():
     try:
         identity = get_jwt_identity()
+        # print("JWT Identity:", identity)
         user_id = identity.get("id") if isinstance(identity, dict) else identity
-
+        # print("User ID:", user_id)
         conn = get_connection()
         cursor = conn.cursor()
+
         cursor.execute(
             "SELECT id, name, email, role, created_at FROM users WHERE id=%s LIMIT 1",
             (user_id,)
         )
+
         row = cursor.fetchone()
-        cursor.close(); conn.close()
+
+        cursor.close()
+        conn.close()
 
         if not row:
             return jsonify({"error": "User not found"}), 404
 
-        return jsonify({
+        return {
             "id": row[0],
             "name": row[1],
             "email": row[2],
             "role": row[3],
             "created_at": str(row[4])
-        }), 200
+        }
 
     except Error as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
+
+    except Exception:
+        return {"error": "Unexpected server error"}, 500

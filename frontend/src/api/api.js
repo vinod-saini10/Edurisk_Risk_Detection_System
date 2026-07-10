@@ -1,10 +1,14 @@
 import axios from "axios";
-console.log("API URL:", process.env.REACT_APP_API_URL);
+//console.log("API URL:", process.env.REACT_APP_API_URL);
 
 const API_BASE = process.env.REACT_APP_API_URL;
 
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: 15000,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // 🔥 REQUEST INTERCEPTOR: Attach token to every request

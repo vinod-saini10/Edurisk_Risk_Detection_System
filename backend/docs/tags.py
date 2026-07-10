@@ -1,0 +1,5 @@
+AUTH = "Authentication"
+PREDICT = "Prediction"
+ADMIN = "Admin"
+STUDENT = "Student"
+HISTORY = "History"

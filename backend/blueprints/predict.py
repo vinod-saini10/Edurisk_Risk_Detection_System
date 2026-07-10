@@ -6,7 +6,8 @@ Includes full Explainable AI (XAI) response payload.
 import os, io
 import pandas as pd
 import numpy as np
-from flask import Blueprint, request, jsonify, send_file
+from flask import request, jsonify, send_file
+from apiflask import APIBlueprint
 from flask_jwt_extended import (
     get_jwt_identity, verify_jwt_in_request, jwt_required
 )
@@ -23,8 +24,16 @@ from utils.insights_engine import (
     generate_recommendations,
     simulate_whatif,
 )
-
-predict_bp = Blueprint("predict", __name__, url_prefix="/api/predict")
+from docs.predict_schema import (
+    PredictSchema,
+    PredictResponseSchema
+)
+predict_bp = APIBlueprint(
+    "predict",
+    __name__,
+    url_prefix="/api/predict",
+    tag="Prediction"
+)
 
 # Models injected via bootstrap
 _rf_model  = None
@@ -56,9 +65,28 @@ def _compute_confidence(rf_pred, xgb_pred=None):
     except Exception:
         return None
 
-@predict_bp.route("", methods=["POST", "OPTIONS"])
+@predict_bp.post("")
+@predict_bp.doc(
+    tags=["Prediction"],
+    summary="Predict Student Academic Risk",
+    security=[{"BearerAuth": []}],
+    description="""
+Predict the student's final academic performance using the trained
+Random Forest and XGBoost models.
+
+This endpoint:
+
+• predicts final score
+• classifies risk level
+• generates Explainable AI insights
+• returns SHAP feature importance
+• stores prediction in database
+"""
+)
+@predict_bp.input(PredictSchema)
+@predict_bp.output(PredictResponseSchema)
 @jwt_required()
-def predict():
+def predict(json_data):
     # Handle CORS preflight
     if request.method == "OPTIONS":
         return ('', 200)
@@ -66,7 +94,7 @@ def predict():
         identity = get_jwt_identity()
         user_id = identity.get("id") if isinstance(identity, dict) else identity
         
-        data = request.get_json(force=True) or {}
+        data = json_data
         # Accept both old and new field names for compatibility
         required = ["name", "email", "attendance", "study_hours"]
         for f in required:
@@ -180,12 +208,19 @@ def predict():
             "shap_detail":        shap_data,
         }
 
-        return jsonify(response_payload), 200
+        return response_payload
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@predict_bp.route("/bulk", methods=["POST"])
+@predict_bp.post("/bulk")
+@predict_bp.doc(
+    tags=["Prediction"],
+    summary="Bulk Prediction",
+    description="Upload a CSV file and generate predictions for multiple students."
+ )
+#@predict_bp.input(BulkUploadSchema, location="files")
+#@predict_bp.output(BulkPredictionResponseSchema)
 @jwt_required()
 def bulk_predict():
     """Step 7: CSV Upload for Bulk Prediction."""
@@ -199,7 +234,7 @@ def bulk_predict():
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
     
-    file = request.files['file']
+    file = request.files["file"]
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     
@@ -296,14 +331,24 @@ def bulk_predict():
     except Exception as e:
         return jsonify({"error": f"CSV processing failed: {str(e)}"}), 500
 
-@predict_bp.route("/info", methods=["GET"])
+@predict_bp.get("/info")
+@predict_bp.doc(
+    tags=["Prediction"],
+    summary="Model Information",
+    description="Returns metadata about the trained ML models."
+)
 def info():
     """Model metadata info."""
     clean_info = {k: v for k, v in _meta.items() if k != "feature_importance"}
     return jsonify(clean_info), 200
 
 
-@predict_bp.route("/explain/<int:pred_id>", methods=["GET"]) 
+@predict_bp.get("/explain/<int:pred_id>")
+@predict_bp.doc(
+    tags=["Prediction"],
+    summary="Explain Prediction",
+    description="Returns SHAP explanation and AI recommendations for a prediction."
+)
 @jwt_required()
 def explain_prediction(pred_id):
     """Return SHAP explanation and recommendations for a stored prediction."""
@@ -357,7 +402,7 @@ def explain_prediction(pred_id):
 
         cursor.close(); conn.close()
 
-        return jsonify({
+        return {
             "prediction_id":  pred_id,
             "predicted_score": float(score),
             "risk_level":      risk,
@@ -369,7 +414,7 @@ def explain_prediction(pred_id):
                 "what_if":          what_if,
             },
             "shap_detail": shap_data,
-        }), 200
+        }
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500

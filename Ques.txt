@@ -1,0 +1,42 @@
+Q.If an interviewer asks "Explain your backend testing process.(API testing)", you can answer:
+ans="After implementing each REST API, 
+I tested it using Swagger UI. I verified request validation, 
+authentication using JWT Bearer tokens, response schemas, HTTP status codes, database updates, 
+and error handling. I also tested edge cases like duplicate registration, invalid OTPs, 
+unauthorized access, and role-based admin endpoints. 
+This ensured the backend was stable before integrating it with the React frontend."
+
+Q. Boilerplate code
+Suppose you create a Flask API.
+
+Without APIFlask, you might write this for every endpoint:
+example:-
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    if "email" not in data:
+        return jsonify({"error": "Email required"}), 400
+
+    if "password" not in data:
+        return jsonify({"error": "Password required"}), 400
+
+    return jsonify({"message": "Success"}), 200
+
+Every API needs:
+
+Reading JSON
+Validating input
+Returning JSON
+Handling errors
+
+This repeated setup is boilerplate code
+
+"How did APIFlask reduce boilerplate in your project?"
+
+A strong answer is:
+
+"APIFlask reduced boilerplate by automatically validating requests using schemas,
+ serializing responses, generating Swagger documentation, and providing consistent error handling.
+  This let me focus on implementing the application's business logic 
+  instead of writing repetitive validation and documentation code."

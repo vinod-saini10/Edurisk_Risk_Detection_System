@@ -2,6 +2,8 @@ flask==3.0.3
 flask-cors==4.0.1
 flask-jwt-extended==4.6.0
 flask-bcrypt==1.0.1
+apiflask==2.3.2
+
 scikit-learn==1.5.1
 xgboost==2.0.3
 shap==0.45.0

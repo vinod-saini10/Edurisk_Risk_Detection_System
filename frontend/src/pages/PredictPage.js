@@ -1,24 +1,94 @@
 /**
  * PredictPage.js — Step 5: Reusable validation via validate.js
  */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+
 import { predictStudent } from "../api/api";
 import { validatePredictForm } from "../utils/validate";
 
-
 const fields = [
-  { name: "name",           label: "Full Name",        type: "text",   min: null, max: null, placeholder: "e.g. Vinod Sharma",   icon: "👤", hint: null },
-  { name: "email",          label: "Email Address",    type: "email",  min: null, max: null, placeholder: "e.g. vinod@pcu.edu",   icon: "✉️", hint: null },
-  { name: "attendance",     label: "Attendance (%)",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "📅", hint: "Range: 0 – 100%" },
-  { name: "study_hours",    label: "Study Hours/Day",  type: "number", min: 0,    max: 10,   placeholder: "Enter 0 – 10",          icon: "📖", hint: "Range: 0 – 10 hrs/day" },
-  { name: "previous_marks", label: "Previous Marks",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "📝", hint: "Range: 0 – 100" },
-  { name: "assignment_score", label: "Assignment Score", type: "number", min: 0, max: 100,  placeholder: "Enter 0 – 100",         icon: "📋", hint: "Range: 0 – 100" },
-  { name: "internal_marks", label: "Internal Marks",   type: "number", min: 0,    max: 100,  placeholder: "Enter 0 – 100",         icon: "🧪", hint: "Range: 0 – 100" },
+  {
+    name: "name",
+    label: "Full Name",
+    type: "text",
+    min: null,
+    max: null,
+    placeholder: "e.g. Vinod Sharma",
+    icon: "👤",
+    hint: null,
+  },
+  {
+    name: "email",
+    label: "Email Address",
+    type: "email",
+    min: null,
+    max: null,
+    placeholder: "e.g. vinod@pcu.edu",
+    icon: "✉️",
+    hint: null,
+  },
+  {
+    name: "attendance",
+    label: "Attendance (%)",
+    type: "number",
+    min: 0,
+    max: 100,
+    placeholder: "Enter 0 – 100",
+    icon: "📅",
+    hint: "Range: 0 – 100%",
+  },
+  {
+    name: "study_hours",
+    label: "Study Hours/Day",
+    type: "number",
+    min: 0,
+    max: 10,
+    placeholder: "Enter 0 – 10",
+    icon: "📖",
+    hint: "Range: 0 – 10 hrs/day",
+  },
+  {
+    name: "previous_marks",
+    label: "Previous Marks",
+    type: "number",
+    min: 0,
+    max: 100,
+    placeholder: "Enter 0 – 100",
+    icon: "📝",
+    hint: "Range: 0 – 100",
+  },
+  {
+    name: "assignment_score",
+    label: "Assignment Score",
+    type: "number",
+    min: 0,
+    max: 100,
+    placeholder: "Enter 0 – 100",
+    icon: "📋",
+    hint: "Range: 0 – 100",
+  },
+  {
+    name: "internal_marks",
+    label: "Internal Marks",
+    type: "number",
+    min: 0,
+    max: 100,
+    placeholder: "Enter 0 – 100",
+    icon: "🧪",
+    hint: "Range: 0 – 100",
+  },
 ];
 
-const init = { name: "", email: "", attendance: "", study_hours: "", previous_marks: "", assignment_score: "", internal_marks: "" };
+const init = {
+  name: "",
+  email: "",
+  attendance: "",
+  study_hours: "",
+  previous_marks: "",
+  assignment_score: "",
+  internal_marks: "",
+};
 
 export default function PredictPage() {
   const [form, setForm] = useState(init);
@@ -44,30 +114,34 @@ export default function PredictPage() {
     // Live re-validate only touched fields
     if (touched[name]) {
       const errs = validatePredictForm(newForm);
-      setErrors(p => ({ ...p, [name]: errs[name] || "" }));
+      setErrors((p) => ({ ...p, [name]: errs[name] || "" }));
     }
   };
 
   const handleBlur = (e) => {
     const { name } = e.target;
-    setTouched(p => ({ ...p, [name]: true }));
+    setTouched((p) => ({ ...p, [name]: true }));
     const errs = validatePredictForm(form);
-    setErrors(p => ({ ...p, [name]: errs[name] || "" }));
+    setErrors((p) => ({ ...p, [name]: errs[name] || "" }));
   };
 
   const handleSubmit = async (ev) => {
     ev.preventDefault();
     // Mark all as touched and validate fully
-    const allTouched = Object.fromEntries(fields.map(f => [f.name, true]));
+    const allTouched = Object.fromEntries(fields.map((f) => [f.name, true]));
     setTouched(allTouched);
     const errs = validatePredictForm(form);
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
 
-    setLoading(true); setApiErr("");
+    setLoading(true);
+    setApiErr("");
     try {
       const { data } = await predictStudent({
-        name: form.name,
-        email: form.email,
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
         attendance: parseFloat(form.attendance),
         study_hours: parseFloat(form.study_hours),
         previous_marks: parseFloat(form.previous_marks),
@@ -76,7 +150,11 @@ export default function PredictPage() {
       });
       nav("/result", { state: { result: data } });
     } catch (err) {
-      setApiErr(err.response?.data?.error || "Server error. Is the backend running?");
+      if (!err.response) {
+        setApiErr("Unable to connect to server.");
+      } else {
+        setApiErr(err.response.data?.error || "Prediction failed.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,28 +163,71 @@ export default function PredictPage() {
   return (
     <div style={{ maxWidth: 700, margin: "0 auto", padding: "2.5rem 1.5rem" }}>
       <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontFamily: "'Space Grotesk',sans-serif", fontSize: "1.9rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>
+        <h1
+          style={{
+            fontFamily: "'Space Grotesk',sans-serif",
+            fontSize: "1.9rem",
+            fontWeight: 700,
+            color: "#f1f5f9",
+            marginBottom: 6,
+          }}
+        >
           Predict Academic Risk
         </h1>
         <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
-          Fill in all academic details. The ML model will predict your score and classify your risk level.
+          Fill in all academic details. The ML model will predict your score and
+          classify your risk level.
         </p>
       </div>
 
       {apiErr && (
-        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 10, padding: "0.9rem 1.2rem", marginBottom: "1.5rem", color: "#f87171", fontSize: "0.9rem" }}>
+        <div
+          style={{
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: 10,
+            padding: "0.9rem 1.2rem",
+            marginBottom: "1.5rem",
+            color: "#f87171",
+            fontSize: "0.9rem",
+          }}
+        >
           ⚠ {apiErr}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
-        {fields.map(f => {
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+      >
+        {fields.map((f) => {
           const hasError = !!errors[f.name];
           return (
             <div key={f.name}>
-              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#94a3b8", marginBottom: 6, letterSpacing: "0.04em" }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  color: "#94a3b8",
+                  marginBottom: 6,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 {f.icon} {f.label}
-                {hasError && <span style={{ color: "#f87171", marginLeft: 6, fontSize: "0.75rem", fontWeight: 400 }}>— {errors[f.name]}</span>}
+                {hasError && (
+                  <span
+                    style={{
+                      color: "#f87171",
+                      marginLeft: 6,
+                      fontSize: "0.75rem",
+                      fontWeight: 400,
+                    }}
+                  >
+                    — {errors[f.name]}
+                  </span>
+                )}
               </label>
               <input
                 id={f.name}
@@ -121,16 +242,31 @@ export default function PredictPage() {
                 onBlur={handleBlur}
                 aria-invalid={hasError}
                 style={{
-                  width: "100%", padding: "0.75rem 1rem",
-                  background: hasError ? "rgba(239,68,68,0.07)" : "rgba(255,255,255,0.05)",
+                  width: "100%",
+                  padding: "0.75rem 1rem",
+                  background: hasError
+                    ? "rgba(239,68,68,0.07)"
+                    : "rgba(255,255,255,0.05)",
                   border: `1px solid ${hasError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}`,
-                  borderRadius: 10, color: "#f1f5f9", fontSize: "0.95rem", outline: "none",
-                  transition: "border-color 0.2s", boxSizing: "border-box",
+                  borderRadius: 10,
+                  color: "#f1f5f9",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                  boxSizing: "border-box",
                 }}
-                onFocus={e => e.target.style.borderColor = "#4f6ef7"}
+                onFocus={(e) => (e.target.style.borderColor = "#4f6ef7")}
               />
               {f.hint && !hasError && (
-                <p style={{ margin: "3px 0 0 2px", fontSize: "0.7rem", color: "#475569" }}>{f.hint}</p>
+                <p
+                  style={{
+                    margin: "3px 0 0 2px",
+                    fontSize: "0.7rem",
+                    color: "#475569",
+                  }}
+                >
+                  {f.hint}
+                </p>
               )}
             </div>
           );
@@ -138,12 +274,24 @@ export default function PredictPage() {
 
         {/* Live validation summary */}
         {Object.values(errors).some(Boolean) && (
-          <div style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "0.75rem 1rem", fontSize: "0.8rem" }}>
-            <p style={{ margin: "0 0 4px", color: "#f87171", fontWeight: 600 }}>Please fix the following:</p>
+          <div
+            style={{
+              background: "rgba(239,68,68,0.06)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              borderRadius: 10,
+              padding: "0.75rem 1rem",
+              fontSize: "0.8rem",
+            }}
+          >
+            <p style={{ margin: "0 0 4px", color: "#f87171", fontWeight: 600 }}>
+              Please fix the following:
+            </p>
             <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#fca5a5" }}>
-              {Object.entries(errors).filter(([, v]) => v).map(([k, v]) => (
-                <li key={k}>{v}</li>
-              ))}
+              {Object.entries(errors)
+                .filter(([, v]) => v)
+                .map(([k, v]) => (
+                  <li key={k}>{v}</li>
+                ))}
             </ul>
           </div>
         )}
@@ -153,9 +301,16 @@ export default function PredictPage() {
           disabled={loading}
           style={{
             marginTop: "0.5rem",
-            background: loading ? "rgba(79,110,247,0.4)" : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
-            color: "#fff", border: "none", borderRadius: 12, padding: "0.9rem",
-            fontSize: "1rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
+            background: loading
+              ? "rgba(79,110,247,0.4)"
+              : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 12,
+            padding: "0.9rem",
+            fontSize: "1rem",
+            fontWeight: 600,
+            cursor: loading ? "not-allowed" : "pointer",
             boxShadow: loading ? "none" : "0 4px 20px rgba(79,110,247,0.35)",
             transition: "all 0.2s",
           }}

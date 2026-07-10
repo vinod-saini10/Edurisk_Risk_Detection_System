@@ -1,3 +1,4 @@
+from utils.logger import logger
 import os
 import time
 import mysql.connector
@@ -115,13 +116,13 @@ def initialize_database():
             cursor.execute("SHOW COLUMNS FROM student_profiles LIKE 'image_url'")
             if cursor.fetchone() is None:
                 cursor.execute("ALTER TABLE student_profiles ADD COLUMN image_url VARCHAR(512) NULL")
-                print("[DB] Added column 'image_url' to student_profiles")
+                logger.info("Added 'image_url' column to student_profiles.")
 
             # Check for updated_at column
             cursor.execute("SHOW COLUMNS FROM student_profiles LIKE 'updated_at'")
             if cursor.fetchone() is None:
                 cursor.execute("ALTER TABLE student_profiles ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-                print("[DB] Added column 'updated_at' to student_profiles")
+                logger.info("Added 'updated_at' column to student_profiles.")
         except Exception as migr_err:
             print(f"[DB MIGRATION] Skipped migration: {migr_err}")
 
@@ -129,10 +130,10 @@ def initialize_database():
         cursor.close()
         conn.close()
 
-        print("[DB] Database initialized successfully")
+        logger.info("Database initialized successfully.")
 
     except Error as e:
-        print(f"[DB ERROR] {e}")
+        logger.exception("Database initialization failed.")
         raise
 
 
@@ -192,6 +193,6 @@ def run_profile_migrations():
 
         cursor.close()
         conn.close()
-        print("[DB MIGRATION] Profile migrations applied")
+        logger.info("Profile migrations applied.")
     except Exception as e:
-        print("[DB MIGRATION] Skipped or failed:", e)
+        logger.exception("Profile migration failed.")

@@ -2,18 +2,34 @@
 history.py — Step 8: Modular REST API Structuring
 User Prediction History Blueprint
 """
-
-from flask import Blueprint, request, jsonify
+from docs.history_schema import (
+    HistoryItemSchema,
+    PreviousRequestSchema
+)
+from flask import request, jsonify
+from apiflask import APIBlueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from mysql.connector import Error
 from database.db_config import get_connection
 
 # Create blueprint for history routes
-history_bp = Blueprint("history", __name__, url_prefix="/api/history")
+history_bp = APIBlueprint(
+    "history",
+    __name__,
+    url_prefix="/api/history",
+    tag="History"
+)
 
 
-@history_bp.route("", methods=["GET"])
-@jwt_required()  # 🔐 Protect route with JWT
+@history_bp.get("")
+@history_bp.doc(
+    tags=["History"],
+    summary="User Prediction History",
+    description="Returns prediction history of authenticated user.",
+    security=[{"BearerAuth": []}]
+)
+@history_bp.output(HistoryItemSchema(many=True))
+@jwt_required() # 🔐 Protect route with JWT
 def get_user_history():
     """
     Get all prediction history for logged-in user
@@ -41,7 +57,7 @@ def get_user_history():
 
         # 🔹 Fetch history for this user
         cursor.execute("""
-            SELECT s.name, s.email,
+            SELECT p.id,s.name, s.email,
                    ar.attendance, ar.study_hours, ar.previous_marks,
                    ar.assignment_score, ar.internal_marks,
                    p.predicted_score, p.risk_level, p.confidence,
@@ -71,21 +87,28 @@ def get_user_history():
 
             result.append(d)
 
-        return jsonify(result), 200
+        return result
 
     except Exception as e:
         print("History Error:", str(e))  # debug log
         return jsonify({"error": str(e)}), 500
 
 
-@history_bp.route("/previous", methods=["POST"])
-def get_previous():
+@history_bp.post("/previous")
+@history_bp.doc(
+    tags=["History"],
+    summary="Previous Prediction",
+    description="Returns latest prediction using name and email."
+)
+@history_bp.input(PreviousRequestSchema)
+@history_bp.output(HistoryItemSchema)
+def get_previous(json_data):
     """
     Get latest prediction for name+email (no login required)
     """
     try:
         # 🔹 Get request data
-        data = request.get_json(force=True) or {}
+        data = json_data
         name = str(data.get("name", "")).strip()
         email = str(data.get("email", "")).strip()
 
@@ -112,7 +135,7 @@ def get_previous():
 
         # 🔹 Fetch latest prediction
         cursor.execute("""
-            SELECT s.name, s.email,
+            SELECT p.id,s.name, s.email,
                    ar.attendance, ar.study_hours, ar.previous_marks,
                    ar.assignment_score, ar.internal_marks,
                    p.predicted_score, p.risk_level, p.confidence,
@@ -135,7 +158,7 @@ def get_previous():
 
         # 🔹 Convert to JSON
         keys = [
-            "name", "email", "attendance", "study_hours", "previous_marks",
+            "id","name", "email", "attendance", "study_hours", "previous_marks",
             "assignment_score", "internal_marks", "predicted_score",
             "risk_level", "confidence", "created_at"
         ]
@@ -146,7 +169,7 @@ def get_previous():
         if result.get("created_at"):
             result["created_at"] = str(result["created_at"])
 
-        return jsonify(result), 200
+        return result
 
     except Exception as e:
         print("Previous Error:", str(e))

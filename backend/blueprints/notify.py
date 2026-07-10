@@ -1,12 +1,30 @@
-from flask import Blueprint, request, jsonify
+from docs.notify_schema import (
+    NotifyRequestSchema,
+    NotifyResponseSchema,
+)
+from flask import jsonify
+from apiflask import APIBlueprint
 from utils.email_service import send_email
 
-notify_bp = Blueprint("notify", __name__, url_prefix="/api/notify")
+notify_bp = APIBlueprint(
+    "notify",
+    __name__,
+    url_prefix="/api/notify",
+    tag="Notification"
+)
+#_____________________________________Email decorator________________
+@notify_bp.post("/email")
+@notify_bp.doc(
+    tags=["Notification"],
+    summary="Send Risk Alert Email",
+    description="Sends a risk notification email to the student."
+)
+@notify_bp.input(NotifyRequestSchema)
+@notify_bp.output(NotifyResponseSchema)
 
-@notify_bp.route("/email", methods=["POST"])
-def send_email_api():
+def send_email_api(json_data):
     try:
-        data = request.get_json()
+        data = json_data
 
         # 🔥 MATCH FRONTEND
         to_email = data.get("to_email")
@@ -33,7 +51,7 @@ Please take immediate action.
         success = send_email(to_email, subject, message)
 
         if success:
-            return jsonify({"message": "Email sent"}), 200
+            return ({"message": "Email sent"})
         else:
             return jsonify({"error": "Email failed"}), 500
 
