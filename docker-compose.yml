@@ -1,68 +1,86 @@
-version: '3.8'
-
 services:
   mysql:
-    image: mysql:8
-    restart: always
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: edurisk
+      MYSQL_ROOT_HOST: "%"
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent",
+        ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
     networks:
       - edurisk_net
 
   backend:
-    build: ./backend
-    restart: always
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_NAME: edurisk_db
+      FRONTEND_URL: http://localhost:3000
+      FLASK_ENV: production
     ports:
       - "5000:5000"
     depends_on:
       mysql:
         condition: service_healthy
-    environment:
-      DB_HOST: mysql
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: edurisk
     volumes:
-      - ./backend/data:/app/data
-      - ./backend/models:/app/models
+      - backend_logs:/app/logs
+      - backend_uploads:/app/static/uploads
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "from urllib.request import urlopen; urlopen(''http://127.0.0.1:5000/api/health'').read()"',
+        ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 90s
     networks:
       - edurisk_net
 
   frontend:
-    build: ./frontend
-    restart: always
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
-      - backend
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - HOST=0.0.0.0
+      backend:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
     networks:
       - edurisk_net
 
 volumes:
   mysql_data:
+  backend_logs:
+  backend_uploads:
 
 networks:
   edurisk_net:
