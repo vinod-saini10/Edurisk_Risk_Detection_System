@@ -273,12 +273,12 @@ cd Early_EduRisk
 cd backend
 
 # Create and activate virtual environment
-python -m venv venv
+python -m venv venv310
 
 # Windows:
-venv\Scripts\activate
+venv310\Scripts\activate
 # macOS/Linux:
-source venv/bin/activate
+source venv310/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -877,7 +877,7 @@ condition that the above copyright notice is included in all copies.
 
 **MCA Student | Full-Stack Developer | ML Enthusiast**
 
-*Final Year MCA Project — PCU (Peoples College of University), Bhopal*
+*Final Year MCA Project — PCU (Pimpri Chinchwad  University), Maharastra*
 
 </div>
 
@@ -888,7 +888,7 @@ condition that the above copyright notice is included in all copies.
 | Platform | Link |
 |----------|------|
 | 🐙 GitHub | [github.com/vinod-saini10](https://github.com/vinod-saini10) |
-| 💼 LinkedIn | [linkedin.com/in/vinod-saini](https://linkedin.com/in/vinod-saini) |
+| 💼 LinkedIn | [linkedin.com/in/vinod-saini](https://www.linkedin.com/in/vinod-saini-37b71a25b/) |
 | 📧 Email | [vinod.saini24@pcu.edu.in](mailto:vinod.saini24@pcu.edu.in) |
 
 ---
