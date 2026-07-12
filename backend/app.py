@@ -58,18 +58,23 @@ def create_app():
     # ─────────────────────────────
     # 🔹 1. CORS CONFIG
     # ─────────────────────────────
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://eduriskdetectionsystem.vercel.app",
+                        ]
+
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url and frontend_url not in allowed_origins:
+        allowed_origins.append(frontend_url)
 
     CORS(
         app,
-        supports_credentials=True,
-        origins=[
-            "http://localhost:3000",
-            frontend_url,
-        ],
-        allow_headers=["Authorization", "Content-Type", "Accept"],
-        expose_headers=["Authorization"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            resources={r"/api/*": {"origins": allowed_origins}},
+            supports_credentials=True,
+            allow_headers=["Authorization", "Content-Type", "Accept"],
+            expose_headers=["Authorization"],
+            methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     )
 
     # ─────────────────────────────
